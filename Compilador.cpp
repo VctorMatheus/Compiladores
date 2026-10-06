@@ -8,7 +8,6 @@
 #include "SemanticError.h"
 
 #include <algorithm>
-#include <sstream>
 #include <memory>
 
 namespace {
@@ -41,8 +40,7 @@ QString lexemaEm(const std::string &fonte, int posicao)
     if (posicao < 0 || static_cast<size_t>(posicao) >= fonte.size())
         return QStringLiteral("fim do programa");
 
-    std::istringstream in(fonte);
-    Lexico lexico(in);
+    Lexico lexico(fonte.c_str());
     lexico.setPosition(static_cast<unsigned>(posicao));
     try {
         std::unique_ptr<Token> token(lexico.nextToken());
@@ -68,8 +66,7 @@ ResultadoCompilacao Compilador::compilar(const QString &codigoFonte)
     ResultadoCompilacao r;
     const std::string fonte = codigoFonte.toStdString();
 
-    std::istringstream in(fonte);
-    Lexico lexico(in);
+    Lexico lexico(fonte.c_str());
     Sintatico sintatico;
     Semantico semantico;
 
