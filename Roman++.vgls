@@ -1,0 +1,309 @@
+%%%VERSION 2%%%
+#Options
+GenerateScanner = false
+GenerateParser = true
+Language = Python
+ScannerName = Lexico
+ParserName = Sintatico
+SemanticName = Semantico
+Parser = SLR
+#RegularDefinitions
+LETRA : [a-zA-Z]
+DIGITO : [0-9]
+HEXDIG : [0-9a-fA-F]
+BINDIG : [01]
+#Tokens
+ID : ({LETRA}|_) ({LETRA}|{DIGITO}|_)*
+
+//COMENTÁRIOS
+SL_COMM :  [/][/][^\n\r]*
+ML_COMM :! [/][\*]+.*[\*]+[/]
+
+// controle de fluxo
+IF          = ID : "si"
+THEN        = ID : "ergo" //utilizando o DO no if
+ELSE        = ID : "aliter"
+WHILE       = ID : "dum"
+DO          = ID : "fac"
+FOR         = ID : "pro"
+REPEAT      = ID : "iterum"
+UNTIL       = ID : "usque"
+SWITCH      = ID : "opta"
+CASE        = ID : "casus"
+
+
+// blocos - aq seria interessante deixar esses blocos para o programa ( muito texto para bloco de funcao)
+BEGIN       = ID : "principium"
+END         = ID : "terminus"
+BREAK       = ID : "exi"
+// utilizei o {} ou sic...cis  
+O_CUR_BRAC   : "{"
+C_CUR_BRAC   : "}"
+O_CB_EXT     = ID : "sic"
+C_CB_EXT     = ID : "cis"
+
+
+// tipos
+INT         = ID : "atomus"
+FLOAT       = ID : "fractio"
+CHAR        = ID : "caracter"
+BOOL        = ID : "logicum"
+STRING      = ID : "catena"
+// literais booleanos
+TRUE        = ID : "verum"
+FALSE       = ID : "falsus"
+// entrada e saída
+READ        = ID : "legere"
+WRITE       = ID : "inscribe"
+// subprogramas
+FUNCTION    = ID : "opus"
+PROCEDURE   = ID : "munus"
+RETURN      = ID : "reditus"
+
+
+// ---- descartados ----
+: [\s\t\n\r]+
+
+  // Relacionais e atribuição
+ASSIGN       : "="
+EQUAL        : "=="
+DIFF         : "!="
+LESS         : "<"
+GREATER      : ">"
+LESS_EQ      : "<="
+GREAT_EQ     : ">="
+
+// Lógicos
+AND          : "&&"
+OR           : "||"
+NOT          : "!"
+
+// operadores lógicos em extenso
+AND_EXT     = ID : "et"
+OR_EXT      = ID : "vel"
+NOT_EXT     = ID : "non"
+
+
+// Aritméticos (separados p/ precedência na gramática)
+SUM          : "+"
+SUB          : "-"
+MUL          : "*"
+DIV          : "/"
+MOD          : "%"
+
+SUM_EXT     = ID: "adde"
+SUB_EXT     = ID: "minu"
+MUL_EXT     = ID: "mult"
+DIV_EXT     = ID: "divi"
+MOD_EXT     = ID: "modu"
+
+
+// Operacoes Bit a bit
+SHL          : "<<"
+SHR          : ">>"
+BIT_AND      : "&"
+BIT_OR       : "|"
+BIT_NOT      : "~"
+BIT_XOR      : "^"
+
+// Controlers
+O_PARENT     : "("
+C_PARENT     : ")"
+O_SQR_BRAC   : "["
+C_SQR_BRAC   : "]"
+//subi os {} para a linha de blocos
+COMMA        : ","
+COLON        : ":"
+SEMICOLON    : ";"
+
+// literais
+LIT_INT  : {DIGITO}+
+LIT_BIN  : "0b" {BINDIG}+
+LIT_HEX  : "0x" {HEXDIG}+
+LIT_FLOAT : {DIGITO}+ "." {DIGITO}+
+LIT_CHAR : "'" [^'] "'"
+LIT_STR  : \" [^\"]* \"
+
+
+
+
+/// OBS
+// na gramatica, da linha 1 a 17 nao alterei. Precisa verificar se esta certo. só pego a expressao, claud disse p addicionar o Î. É Sobre aquele trem de recursão para esquerda. 
+
+#NonTerminals
+<programa>
+<exp>
+<exp1>
+<exp2>
+<exp3>
+<exp4>
+<exp5>
+<exp6>
+<exp7>
+<exp8>
+<exp9>
+<exp10>
+<op_rel>
+<op_neg>
+<op_bitwise>
+<op_arit_baixa>
+<op_arit_alta>
+<cmd>
+<lista_cmd>
+<var_type>
+<vt_size>
+<vt_index>
+<decl>
+<lista_ids>
+<lista_ids_x>
+<assign>
+<read_st>
+<lista_read>
+<lista_read_x>
+<read_item>
+<write_st>
+<lista_write>
+<lista_write_x>
+<op_block>
+<if_st>
+<elif_st>
+<else_st>
+<while_st>
+<for_st>
+<for_init>
+<for_pos>
+<repeat_st>
+<break_st>
+<func_def>
+<func_block>
+<func_params>
+<func_params_x>
+<param>
+<param_vetor>
+<call_args>
+<call_args_x>
+<func_call>
+<func_return_st>
+<lista_func>
+#Grammar
+<exp>  ::= <exp> OR_EXT <exp1> | <exp1>;
+<exp1> ::= <exp1> AND_EXT <exp2> | <exp2>;
+<exp2> ::= <exp2> BIT_OR <exp3> | <exp3>;
+<exp3> ::= <exp3> BIT_XOR <exp4> | <exp4>;
+<exp4> ::= <exp4> BIT_AND <exp5> | <exp5>;
+<exp5> ::= <exp5> <op_rel> <exp6> | <exp6>;
+<exp6> ::= <exp6> <op_bitwise> <exp7> | <exp7>;
+<exp7> ::= <exp7> <op_arit_baixa> <exp8> | <exp8>;
+<exp8> ::= <exp8> <op_arit_alta> <exp9> | <exp9> ;
+<exp9> ::= <op_neg> <exp10> | <exp10>;
+<exp10> ::= ID
+            | LIT_FLOAT 
+            | LIT_INT 
+            | LIT_STR
+            | TRUE
+            | FALSE
+            | ID <vt_index>
+            | ID O_PARENT <call_args> C_PARENT
+            | O_PARENT <exp> C_PARENT
+            | LIT_CHAR
+            | LIT_HEX;
+
+<op_rel> ::= GREATER | LESS | GREAT_EQ | LESS_EQ | EQUAL | DIFF; 
+<op_neg> ::=  BIT_NOT | NOT | NOT_EXT;
+<op_bitwise> ::= SHL | SHR;
+<op_arit_baixa> ::= SUM | SUM_EXT | SUB | SUB_EXT;
+<op_arit_alta> ::=  MUL | MUL_EXT | DIV | DIV_EXT | MOD | MOD_EXT;
+
+
+
+// Comandos Disponiveis
+
+<cmd> ::=  <if_st> 
+          | <while_st> 
+          | <for_st> 
+          | <repeat_st> 
+          | <break_st> 
+          | <assign> 
+          | <decl>
+          | <read_st>
+          | <write_st>
+          | <func_return_st>
+          | <func_call>;
+
+
+// Agregador de comandos ( Pilha ) 
+
+<lista_cmd> ::= <cmd> <lista_cmd> | î ; 
+
+// Declaracoes de variaveis
+<var_type> ::= INT #1 | FLOAT #1 | CHAR #1 | BOOL #1 | STRING #1;
+
+<vt_size> ::= O_SQR_BRAC <exp> C_SQR_BRAC  | î  ;
+<vt_index> ::= O_SQR_BRAC <exp> C_SQR_BRAC;
+
+<decl> ::= <var_type> <lista_ids> SEMICOLON;
+
+<lista_ids>  ::= ID #2 <vt_size> <lista_ids_x> ;
+<lista_ids_x> ::= COMMA ID <vt_size> <lista_ids_x> | î ;
+
+<assign> ::= ID ASSIGN <exp> SEMICOLON | ID <vt_index> ASSIGN <exp> SEMICOLON ;
+
+
+// CIn e Cout
+<read_st>     ::= READ O_PARENT <lista_read> C_PARENT SEMICOLON ;
+<lista_read>  ::= <read_item> <lista_read_x> ;
+<lista_read_x> ::= COMMA <read_item> <lista_read_x> | î ;
+<read_item>   ::= ID | ID <vt_index> ;
+
+<write_st>    ::= WRITE O_PARENT <lista_write> C_PARENT SEMICOLON ;
+<lista_write> ::= <exp> <lista_write_x> ;
+<lista_write_x> ::= COMMA <exp> <lista_write_x> | î ;
+
+// Bloco de operacoes
+
+<op_block> ::= O_CUR_BRAC <lista_cmd> C_CUR_BRAC | O_CB_EXT <lista_cmd> C_CB_EXT;
+
+
+<if_st> ::= IF O_PARENT <exp> C_PARENT DO <op_block> <elif_st>;
+<elif_st> ::= ELSE <else_st> | î ;
+<else_st> ::= <if_st> | <op_block>;
+
+
+<while_st> ::= WHILE O_PARENT <exp> C_PARENT DO <op_block>;
+
+<for_st> ::= FOR O_PARENT <for_init> SEMICOLON <exp> SEMICOLON <for_pos> C_PARENT DO <op_block> ;
+<for_init> ::= ID ASSIGN <exp> ;
+<for_pos>  ::= ID ASSIGN <exp>;
+
+<repeat_st> ::= REPEAT <op_block> UNTIL O_PARENT <exp> C_PARENT SEMICOLON ;
+<break_st> ::= BREAK SEMICOLON ;
+
+// Functions
+<func_def> ::= FUNCTION ID O_PARENT <func_params> C_PARENT <func_block>;
+
+<func_block> ::= O_CB_EXT <lista_cmd> C_CB_EXT ;
+
+<func_params>    ::= <param> <func_params_x> | î ;
+<func_params_x>  ::= COMMA <param> <func_params_x> | î ;
+
+<param>     ::= <var_type> ID <param_vetor> ;
+<param_vetor> ::= O_SQR_BRAC C_SQR_BRAC | î ;
+
+
+<call_args>    ::= <exp> <call_args_x> | î ;
+<call_args_x>  ::= COMMA <exp> <call_args_x> | î ;
+
+<func_call> ::= ID O_PARENT <call_args> C_PARENT SEMICOLON;
+<func_return_st> ::= RETURN <exp> SEMICOLON ;
+<lista_func> ::= <func_def> <lista_func> | î ;
+
+
+//bloco inicial
+<programa> ::= BEGIN <lista_func> <lista_cmd> END;
+
+
+
+
+
+#SimulatorText
+cHJpbmNpcGl1bQoKICBvcHVzIGZ1bmN0aW9uX25hbWUoYXRvbXVzIHhfcCkgc2ljCiAgICAKICAgIAogIGNpcwoKICBmdW5jdGlvbl9uYW1lKGEpIGV0CiAgIAoKdGVybWludXM=

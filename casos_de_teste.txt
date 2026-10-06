@@ -1,0 +1,357 @@
+CASOS DE TESTE - LINGUAGEM ROMAN++ (análise léxica e sintática)
+=================================================================
+
+Como usar:
+  Copie o código de cada caso (o que vem depois da linha "---") para a IDE
+  e clique em Compilar. O resultado deve bater com a linha "ESPERADO".
+
+  As linhas de erro são contadas a partir da primeira linha do código do caso.
+
+Lembretes da gramática (Roman++.vgls):
+  - Programa:     principium <funções> <comandos> terminus
+  - Funções:      opus nome(tipo p, tipo v[]) sic ... cis   (só no início do programa)
+  - Blocos:       { ... }  ou  sic ... cis
+  - si:           si (cond) fac { ... } aliter { ... }      (usa "fac", não "ergo")
+  - Tipos:        atomus, fractio, caracter, logicum, catena
+  - Lógicos:      et, vel, non, !       (&& e || existem no léxico, mas não na gramática)
+
+
+#################################################################
+#                        CASOS DE SUCESSO                        #
+#################################################################
+
+=== S01 - Programa mínimo (vazio)
+ESPERADO: SUCESSO
+---
+principium
+terminus
+
+=== S02 - Declarações de todos os tipos, listas e vetores
+ESPERADO: SUCESSO
+---
+principium
+  atomus a, b, c;
+  fractio media;
+  caracter letra;
+  logicum ok;
+  catena nome;
+  atomus v[10], m[2 * 5], i;
+terminus
+
+=== S03 - Atribuições com literais (int, float, char, string, hex, booleanos)
+ESPERADO: SUCESSO
+---
+principium
+  atomus a;
+  fractio f;
+  caracter c;
+  catena s;
+  logicum ok;
+  atomus v[5];
+  a = 42;
+  f = 3.14;
+  c = 'x';
+  s = "Roma Antiqua";
+  ok = verum;
+  ok = falsus;
+  v[0] = 0xFF;
+  v[a + 1] = a;
+terminus
+
+=== S04 - Expressões aritméticas, relacionais, lógicas e bit a bit
+ESPERADO: SUCESSO
+---
+principium
+  atomus a, b, c;
+  logicum ok;
+  a = (a + b) * 2 - c / 4 % 3;
+  b = a adde b minu c mult 2 divi 4 modu 3;
+  c = a << 2 | b & 3 ^ ~c >> 1;
+  ok = a > b et b != c vel non ok;
+  ok = !ok vel a <= b et b >= c vel a == c vel a < c;
+terminus
+
+=== S05 - Entrada e saída (legere / inscribe)
+ESPERADO: SUCESSO
+---
+principium
+  atomus a, v[3];
+  legere(a);
+  legere(a, v[2]);
+  inscribe("Resultado: ", a + 1, v[0]);
+terminus
+
+=== S06 - si / aliter si / aliter, com os dois estilos de bloco
+ESPERADO: SUCESSO
+---
+principium
+  atomus a, b;
+  si (a > b) fac {
+    inscribe(a);
+  } aliter si (a == b) fac sic
+    inscribe(0);
+  cis aliter {
+    inscribe(b);
+  }
+  si (a) fac { }
+terminus
+
+=== S07 - Laços: dum, pro, iterum/usque e exi
+ESPERADO: SUCESSO
+---
+principium
+  atomus a, i, v[10];
+  dum (a < 10) fac {
+    a = a + 1;
+    si (a == 5) fac { exi; }
+  }
+  pro (i = 0; i < 10; i = i + 1) fac {
+    v[i] = i * i;
+  }
+  iterum {
+    a = a - 1;
+  } usque (a <= 0);
+terminus
+
+=== S08 - Funções: definição, parâmetros vetor, retorno e chamadas
+ESPERADO: SUCESSO
+---
+principium
+  opus soma(atomus x, atomus y) sic
+    reditus x + y;
+  cis
+  opus primeiro(atomus vet[], atomus n) sic
+    reditus vet[0];
+  cis
+  opus zero() sic
+    reditus 0;
+  cis
+
+  atomus a, v[10];
+  a = soma(1, 2);
+  a = soma(soma(1, 2), primeiro(v, 10)) * zero();
+  zero();
+terminus
+
+=== S09 - Programa completo
+ESPERADO: SUCESSO
+---
+principium
+  opus fatorial(atomus n) sic
+    atomus r;
+    r = 1;
+    dum (n > 1) fac {
+      r = r * n;
+      n = n - 1;
+    }
+    reditus r;
+  cis
+
+  atomus num, res;
+  catena msg;
+  msg = "Digite um numero:";
+  inscribe(msg);
+  legere(num);
+  si (num < 0) fac {
+    inscribe("Numero invalido");
+  } aliter {
+    res = fatorial(num);
+    inscribe("Fatorial: ", res);
+  }
+terminus
+
+
+#################################################################
+#                       ERROS LÉXICOS                            #
+#################################################################
+
+=== L01 - Caractere inválido (@)
+ESPERADO: ERRO LÉXICO (linha 3)
+---
+principium
+  atomus a;
+  a = 5 @ 3;
+terminus
+
+=== L02 - String não fechada
+ESPERADO: ERRO LÉXICO (linha 3)
+---
+principium
+  catena nome;
+  nome = "Roma;
+terminus
+
+=== L03 - Literal de caractere com mais de um caractere
+ESPERADO: ERRO LÉXICO (linha 3)
+---
+principium
+  caracter c;
+  c = 'ab';
+terminus
+
+=== L04 - Número real incompleto (3.)
+ESPERADO: ERRO LÉXICO (linha 3)
+---
+principium
+  fractio f;
+  f = 3.;
+terminus
+
+
+#################################################################
+#                      ERROS SINTÁTICOS                          #
+#################################################################
+
+=== E01 - Falta ponto e vírgula
+ESPERADO: ERRO SINTÁTICO (linha 4)
+---
+principium
+  atomus a;
+  a = 1
+  a = 2;
+terminus
+
+=== E02 - Falta "terminus"
+ESPERADO: ERRO SINTÁTICO (linha 3)
+---
+principium
+  atomus a;
+  a = 1;
+
+=== E03 - Falta "principium"
+ESPERADO: ERRO SINTÁTICO (linha 1)
+---
+atomus a;
+a = 1;
+terminus
+
+=== E04 - Parêntese não fechado
+ESPERADO: ERRO SINTÁTICO (linha 3)
+---
+principium
+  atomus a;
+  a = (a + 1 * 2;
+terminus
+
+=== E05 - si usando "ergo" em vez de "fac"
+ESPERADO: ERRO SINTÁTICO (linha 3)
+---
+principium
+  atomus a;
+  si (a > 0) ergo {
+    a = 0;
+  }
+terminus
+
+=== E06 - Operador && (a gramática só aceita "et")
+ESPERADO: ERRO SINTÁTICO (linha 3)
+---
+principium
+  logicum p, q, r;
+  r = p && q;
+terminus
+
+=== E07 - Menos unário (não existe na gramática)
+ESPERADO: ERRO SINTÁTICO (linha 3)
+---
+principium
+  atomus a;
+  a = -5;
+terminus
+
+=== E08 - Literal binário (o token LIT_BIN existe, mas não está em <exp10>)
+ESPERADO: ERRO SINTÁTICO (linha 3)
+---
+principium
+  atomus a;
+  a = 0b101;
+terminus
+
+=== E09 - Declaração com inicialização
+ESPERADO: ERRO SINTÁTICO (linha 2)
+---
+principium
+  atomus a = 5;
+terminus
+
+=== E10 - Função definida depois de um comando
+ESPERADO: ERRO SINTÁTICO (linha 3)
+---
+principium
+  atomus a;
+  opus dobro(atomus x) sic
+    reditus x * 2;
+  cis
+terminus
+
+=== E11 - Corpo de função com { } (função exige sic ... cis)
+ESPERADO: ERRO SINTÁTICO (linha 2)
+---
+principium
+  opus dobro(atomus x) {
+    reditus x * 2;
+  }
+terminus
+
+=== E12 - Bloco aberto com { e fechado com cis
+ESPERADO: ERRO SINTÁTICO (linha 5)
+---
+principium
+  atomus a;
+  dum (a < 10) fac {
+    a = a + 1;
+  cis
+terminus
+
+=== E13 - Falta ";" após usque (...)
+ESPERADO: ERRO SINTÁTICO (linha 6)
+---
+principium
+  atomus a;
+  iterum {
+    a = a - 1;
+  } usque (a <= 0)
+terminus
+
+=== E14 - opta/casus (tokens existem, mas não há regra na gramática)
+ESPERADO: ERRO SINTÁTICO (linha 3)
+---
+principium
+  atomus a;
+  opta (a) {
+    casus 1: a = 0;
+  }
+terminus
+
+=== E15 - Identificador começando com dígito
+ESPERADO: ERRO SINTÁTICO (linha 2)
+---
+principium
+  atomus 1x;
+terminus
+
+=== E16 - Comentário de linha (//)
+ESPERADO: ERRO SINTÁTICO (linha 2)
+OBS: provável BUG na gramática. SL_COMM foi declarado com ":" em vez de ":!",
+     então não é descartado e o sintático o recebe como token. Se a intenção
+     é ignorá-lo, troque para  SL_COMM :! [/][/][^\n\r]*  e este caso vira SUCESSO.
+---
+principium
+  // contador
+  atomus a;
+terminus
+
+=== E17 - Comentário de bloco (/* ... */)
+ESPERADO: ERRO SINTÁTICO (linha 2)
+OBS: provável BUG. No .vgls, ML_COMM está declarado com ":!", mas nos arquivos
+     C++ gerados ele NÃO é descartado: chega ao sintático como token. Para que
+     os comentários sejam ignorados com certeza, declare-os sem nome:
+         : [/][/][^
+]*
+         : [/][\*]+.*[\*]+[/]
+     e regenere os arquivos. Aí este caso (e o E16) passam a dar SUCESSO.
+---
+principium
+  /* comentário ignorado */
+  atomus a;
+terminus

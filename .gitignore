@@ -1,0 +1,12 @@
+# Build (CMake / Qt Creator)
+build/
+build-*/
+CMakeLists.txt.user*
+.qtcreator/
+
+# Python
+__pycache__/
+
+# Sistema
+Thumbs.db
+desktop.ini
