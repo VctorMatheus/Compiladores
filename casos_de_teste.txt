@@ -1,19 +1,23 @@
-CASOS DE TESTE - LINGUAGEM ROMAN++ (análise léxica e sintática)
+CASOS DE TESTE - LINGUAGEM ROMAN++ (análise léxica, sintática e semântica)
 =================================================================
 
 Como usar:
   Copie o código de cada caso (o que vem depois da linha "---") para a IDE
   e clique em Compilar. O resultado deve bater com a linha "ESPERADO".
+  "AVISO (linha N)" significa: compila, e a saída mostra um aviso na linha N.
 
   As linhas de erro são contadas a partir da primeira linha do código do caso.
 
 Lembretes da gramática (Roman++.vgls):
   - Programa:     principium <funções> <comandos> terminus
-  - Funções:      opus nome(tipo p, tipo v[]) sic ... cis   (só no início do programa)
+  - Funções:      opus tipo nome(tipo p, tipo v[]) sic ... cis   (só no início do programa)
+  - Procedimento: munus nome(...) sic ... cis                   ("reditus;" sem valor)
   - Blocos:       { ... }  ou  sic ... cis
   - si:           si (cond) fac { ... } aliter { ... }      (usa "fac", não "ergo")
   - Tipos:        atomus, fractio, caracter, logicum, catena
-  - Lógicos:      et, vel, non, !       (&& e || existem no léxico, mas não na gramática)
+  - Lógicos:      et / &&, vel / ||, non / !
+  - Unários:      non, !, ~, -   (podem ser repetidos: non non a, - -a)
+  - Comentários:  // ... e /* ... */ (podem ter várias linhas; são descartados pelo léxico)
 
 
 #################################################################
@@ -117,13 +121,13 @@ terminus
 ESPERADO: SUCESSO
 ---
 principium
-  opus soma(atomus x, atomus y) sic
+  opus atomus soma(atomus x, atomus y) sic
     reditus x + y;
   cis
-  opus primeiro(atomus vet[], atomus n) sic
+  opus atomus primeiro(atomus vet[], atomus n) sic
     reditus vet[0];
   cis
-  opus zero() sic
+  opus atomus zero() sic
     reditus 0;
   cis
 
@@ -137,7 +141,7 @@ terminus
 ESPERADO: SUCESSO
 ---
 principium
-  opus fatorial(atomus n) sic
+  opus atomus fatorial(atomus n) sic
     atomus r;
     r = 1;
     dum (n > 1) fac {
@@ -158,6 +162,67 @@ principium
     res = fatorial(num);
     inscribe("Fatorial: ", res);
   }
+terminus
+
+=== S10 - Comentário de linha (//)
+ESPERADO: SUCESSO
+---
+principium
+  // contador
+  atomus a;
+  a = 1; // fim da linha
+terminus
+
+=== S11 - Comentário de bloco (/* ... */)
+ESPERADO: SUCESSO
+---
+principium
+  /* comentário ignorado */
+  atomus a;
+  a = 1; /** outro comentário **/
+terminus
+
+=== S12 - Comentário de bloco em várias linhas e vários na mesma linha
+ESPERADO: SUCESSO
+---
+principium
+  /* bloco
+     em várias linhas */
+  atomus a; /* x */ a = 1; /* y */
+  /* com * e ** dentro */
+  /***/
+  a = a /* no meio da expressão */ + 1; // linha
+terminus
+
+=== S13 - Operadores && || e unários repetidos (non non, - -)
+ESPERADO: SUCESSO
+---
+principium
+  atomus a, b;
+  logicum p, q, r;
+  r = p && q || !r;
+  r = non non p et !!q;
+  a = -5;
+  b = -a * -(a + 1) - -2;
+terminus
+
+=== S14 - Literal binário
+ESPERADO: SUCESSO
+---
+principium
+  atomus a;
+  a = 0b1010 | ~0b0001;
+terminus
+
+=== S15 - Procedimento (munus) e reditus sem valor
+ESPERADO: SUCESSO
+---
+principium
+  munus saudar(catena nome) sic
+    inscribe("Ave, ", nome);
+    reditus;
+  cis
+  saudar("Roma");
 terminus
 
 
@@ -243,28 +308,38 @@ principium
   }
 terminus
 
-=== E06 - Operador && (a gramática só aceita "et")
-ESPERADO: ERRO SINTÁTICO (linha 3)
+=== E06 - Função (opus) sem tipo de retorno
+ESPERADO: ERRO SINTÁTICO (linha 2)
 ---
 principium
-  logicum p, q, r;
-  r = p && q;
+  opus dobro(atomus x) sic
+    reditus x * 2;
+  cis
 terminus
 
-=== E07 - Menos unário (não existe na gramática)
+=== E07 - Procedimento (munus) com tipo de retorno
+ESPERADO: ERRO SINTÁTICO (linha 2)
+---
+principium
+  munus atomus p() sic
+  cis
+terminus
+
+=== E08 - Comentário de bloco não fechado
+ESPERADO: ERRO LÉXICO (linha 3)
+---
+principium
+  atomus a;
+  /* comentário sem fim
+  a = 1;
+terminus
+
+=== E16 - Código entre dois comentários na mesma linha não é engolido
 ESPERADO: ERRO SINTÁTICO (linha 3)
 ---
 principium
   atomus a;
-  a = -5;
-terminus
-
-=== E08 - Literal binário (o token LIT_BIN existe, mas não está em <exp10>)
-ESPERADO: ERRO SINTÁTICO (linha 3)
----
-principium
-  atomus a;
-  a = 0b101;
+  /* um */ a = ; /* dois */
 terminus
 
 === E09 - Declaração com inicialização
@@ -279,7 +354,7 @@ ESPERADO: ERRO SINTÁTICO (linha 3)
 ---
 principium
   atomus a;
-  opus dobro(atomus x) sic
+  opus atomus dobro(atomus x) sic
     reditus x * 2;
   cis
 terminus
@@ -288,7 +363,7 @@ terminus
 ESPERADO: ERRO SINTÁTICO (linha 2)
 ---
 principium
-  opus dobro(atomus x) {
+  opus atomus dobro(atomus x) {
     reditus x * 2;
   }
 terminus
@@ -330,28 +405,446 @@ principium
   atomus 1x;
 terminus
 
-=== E16 - Comentário de linha (//)
-ESPERADO: ERRO SINTÁTICO (linha 2)
-OBS: provável BUG na gramática. SL_COMM foi declarado com ":" em vez de ":!",
-     então não é descartado e o sintático o recebe como token. Se a intenção
-     é ignorá-lo, troque para  SL_COMM :! [/][/][^\n\r]*  e este caso vira SUCESSO.
+
+#################################################################
+#              SEMÂNTICO: PROGRAMAS VÁLIDOS                      #
+#################################################################
+
+=== SS01 - Escopos aninhados e sombreamento (como em C)
+ESPERADO: SUCESSO
 ---
 principium
-  // contador
-  atomus a;
+  atomus x;
+  x = 1;
+  si (x > 0) fac {
+    fractio x;
+    x = 2.5;
+    inscribe(x);
+  }
+  inscribe(x);
 terminus
 
-=== E17 - Comentário de bloco (/* ... */)
-ESPERADO: ERRO SINTÁTICO (linha 2)
-OBS: provável BUG. No .vgls, ML_COMM está declarado com ":!", mas nos arquivos
-     C++ gerados ele NÃO é descartado: chega ao sintático como token. Para que
-     os comentários sejam ignorados com certeza, declare-os sem nome:
-         : [/][/][^
-]*
-         : [/][\*]+.*[\*]+[/]
-     e regenere os arquivos. Aí este caso (e o E16) passam a dar SUCESSO.
+=== SS02 - Recursão e vetor como argumento
+ESPERADO: SUCESSO
 ---
 principium
-  /* comentário ignorado */
+  opus atomus fat(atomus n) sic
+    si (n <= 1) fac { reditus 1; }
+    reditus n * fat(n - 1);
+  cis
+  opus fractio media(fractio v[], atomus n) sic
+    fractio s;
+    atomus i;
+    s = 0.0;
+    pro (i = 0; i < n; i = i + 1) fac { s = s + v[i]; }
+    reditus s / n;
+  cis
+  fractio notas[3];
+  notas[0] = 7.5;
+  notas[1] = 8;
+  notas[2] = 9.25;
+  inscribe(fat(5), media(notas, 3));
+terminus
+
+=== SS03 - Conversões implícitas permitidas (int, char, bool, float)
+ESPERADO: SUCESSO
+---
+principium
+  logicum b;
+  atomus i;
+  caracter c;
+  fractio f;
+  b = 3;
+  i = verum + 'a';
+  c = 65;
+  f = i;
+  inscribe(b, i, c, f);
+terminus
+
+=== SS04 - Tamanho de vetor com expressão constante
+ESPERADO: SUCESSO
+---
+principium
+  atomus v[2 * 5 + 0x2], w['c' - 'a'];
+  v[0] = 1;
+  w[0] = v[0];
+  inscribe(w[0]);
+terminus
+
+
+#################################################################
+#                    SEMÂNTICO: AVISOS                           #
+#   (compila, mas a IDE mostra um aviso na linha indicada)       #
+#################################################################
+
+=== SA01 - Conversão de fractio para atomus
+ESPERADO: AVISO (linha 5)
+---
+principium
   atomus a;
+  fractio f;
+  f = 2.5;
+  a = f;
+  inscribe(a);
+terminus
+
+=== SA02 - Variável declarada e nunca usada
+ESPERADO: AVISO (linha 2)
+---
+principium
+  atomus x;
+terminus
+
+=== SA03 - Variável usada sem valor
+ESPERADO: AVISO (linha 3)
+---
+principium
+  atomus a;
+  inscribe(a);
+terminus
+
+=== SA04 - Função que pode terminar sem reditus
+ESPERADO: AVISO (linha 2)
+---
+principium
+  opus atomus f() sic
+    inscribe(1);
+  cis
+  inscribe(f());
+terminus
+
+=== SA05 - Índice constante fora dos limites
+ESPERADO: AVISO (linha 3)
+---
+principium
+  atomus v[3];
+  v[3] = 1;
+  inscribe(v[0]);
+terminus
+
+=== SA06 - Divisão por zero
+ESPERADO: AVISO (linha 3)
+---
+principium
+  atomus a;
+  a = 10 / 0;
+  inscribe(a);
+terminus
+
+=== SA07 - Variável recebe valor mas nunca é lida
+ESPERADO: AVISO (linha 2)
+---
+principium
+  atomus a;
+  a = 1;
+terminus
+
+
+=== SA08 - Função declarada e nunca chamada
+ESPERADO: AVISO (linha 2)
+---
+principium
+  opus atomus dobro(atomus x) sic
+    reditus x * 2;
+  cis
+terminus
+
+=== SA09 - Função recursiva chamada só por ela mesma
+ESPERADO: AVISO (linha 2)
+---
+principium
+  opus atomus f(atomus n) sic
+    reditus f(n - 1);
+  cis
+terminus
+
+#################################################################
+#                    SEMÂNTICO: ERROS                            #
+#################################################################
+
+=== SE01 - Variável não declarada
+ESPERADO: ERRO SEMÂNTICO (linha 2)
+---
+principium
+  x = 1;
+terminus
+
+=== SE02 - Declaração repetida no mesmo escopo
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  atomus a;
+  fractio a;
+terminus
+
+=== SE03 - Parâmetro redeclarado no corpo da função
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  opus atomus f(atomus x) sic
+    atomus x;
+    reditus x;
+  cis
+terminus
+
+=== SE04 - Operador aritmético com catena
+ESPERADO: ERRO SEMÂNTICO (linha 4)
+---
+principium
+  catena s;
+  s = "Roma";
+  s = s + "!";
+terminus
+
+=== SE05 - Atribuir catena a atomus
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  atomus a;
+  a = "Roma";
+terminus
+
+=== SE06 - Resto (%) com fractio
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  fractio f;
+  f = 5.5 % 2;
+terminus
+
+=== SE07 - Condição do tipo catena
+ESPERADO: ERRO SEMÂNTICO (linha 4)
+---
+principium
+  catena s;
+  s = "sim";
+  si (s) fac { }
+terminus
+
+=== SE08 - Índice de vetor fractio
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  atomus v[3];
+  v[1.5] = 0;
+terminus
+
+=== SE09 - Índice em algo que não é vetor
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  atomus a;
+  a[0] = 1;
+terminus
+
+=== SE10 - Vetor sem índice numa expressão
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  atomus v[3], a;
+  a = v + 1;
+terminus
+
+=== SE11 - Tamanho de vetor não constante
+ESPERADO: ERRO SEMÂNTICO (linha 4)
+---
+principium
+  atomus n;
+  n = 3;
+  atomus v[n];
+terminus
+
+=== SE12 - Tamanho de vetor zero
+ESPERADO: ERRO SEMÂNTICO (linha 2)
+---
+principium
+  atomus v[0];
+terminus
+
+=== SE13 - Chamar algo que não é função
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  atomus a;
+  a(1);
+terminus
+
+=== SE14 - Argumentos de menos
+ESPERADO: ERRO SEMÂNTICO (linha 5)
+---
+principium
+  opus atomus soma(atomus x, atomus y) sic
+    reditus x + y;
+  cis
+  inscribe(soma(1));
+terminus
+
+=== SE15 - Argumentos demais
+ESPERADO: ERRO SEMÂNTICO (linha 5)
+---
+principium
+  opus atomus soma(atomus x, atomus y) sic
+    reditus x + y;
+  cis
+  inscribe(soma(1, 2, 3));
+terminus
+
+=== SE16 - Tipo de argumento incompatível
+ESPERADO: ERRO SEMÂNTICO (linha 5)
+---
+principium
+  opus atomus soma(atomus x, atomus y) sic
+    reditus x + y;
+  cis
+  inscribe(soma("um", 2));
+terminus
+
+=== SE17 - Parâmetro vetor recebendo variável simples
+ESPERADO: ERRO SEMÂNTICO (linha 6)
+---
+principium
+  opus atomus primeiro(atomus v[]) sic
+    reditus v[0];
+  cis
+  atomus a;
+  a = primeiro(a);
+terminus
+
+=== SE18 - Vetor de outro tipo como argumento
+ESPERADO: ERRO SEMÂNTICO (linha 6)
+---
+principium
+  opus atomus primeiro(atomus v[]) sic
+    reditus v[0];
+  cis
+  fractio f[3];
+  inscribe(primeiro(f));
+terminus
+
+=== SE19 - Procedimento (munus) usado numa expressão
+ESPERADO: ERRO SEMÂNTICO (linha 5)
+---
+principium
+  munus p() sic
+    inscribe(1);
+  cis
+  inscribe(p());
+terminus
+
+=== SE20 - reditus com valor num munus
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  munus p() sic
+    reditus 1;
+  cis
+terminus
+
+=== SE21 - reditus sem valor num opus
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  opus atomus f() sic
+    reditus;
+  cis
+terminus
+
+=== SE22 - reditus fora de função
+ESPERADO: ERRO SEMÂNTICO (linha 2)
+---
+principium
+  reditus 1;
+terminus
+
+=== SE23 - reditus com tipo incompatível
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  opus atomus f() sic
+    reditus "Roma";
+  cis
+terminus
+
+=== SE24 - exi fora de laço
+ESPERADO: ERRO SEMÂNTICO (linha 2)
+---
+principium
+  exi;
+terminus
+
+=== SE25 - Função declarada duas vezes
+ESPERADO: ERRO SEMÂNTICO (linha 5)
+---
+principium
+  opus atomus f() sic
+    reditus 1;
+  cis
+  opus atomus f() sic
+    reditus 2;
+  cis
+terminus
+
+=== SE26 - Função usada sem os parênteses da chamada
+ESPERADO: ERRO SEMÂNTICO (linha 6)
+---
+principium
+  opus atomus f() sic
+    reditus 1;
+  cis
+  atomus a;
+  a = f + 1;
+terminus
+
+=== SE27 - Atribuição ao vetor inteiro
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  atomus v[3];
+  v = 1;
+terminus
+
+=== SE28 - Variável usada fora do bloco em que foi declarada
+ESPERADO: ERRO SEMÂNTICO (linha 7)
+---
+principium
+  si (verum) fac {
+    atomus x;
+    x = 1;
+    inscribe(x);
+  }
+  x = 2;
+terminus
+
+=== SE29 - Função usando variável do corpo principal
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  opus atomus f() sic
+    reditus total;
+  cis
+  atomus total;
+terminus
+
+=== SE30 - legere de vetor sem índice
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  atomus v[3];
+  legere(v);
+terminus
+
+=== SE31 - Operador lógico com catena
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  logicum b;
+  b = "Roma" et verum;
+terminus
+
+=== SE32 - Operador ~ com fractio
+ESPERADO: ERRO SEMÂNTICO (linha 3)
+---
+principium
+  atomus a;
+  a = ~2.5;
 terminus

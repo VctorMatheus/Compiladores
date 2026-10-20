@@ -1,7 +1,11 @@
 #ifndef COMPILADOR_H
 #define COMPILADOR_H
 
+#include "TabelaSimbolos.h"
+
 #include <QString>
+
+#include <vector>
 
 // Ponte entre a IDE e os analisadores gerados pelo GALS.
 // A interface só conhece esta classe, então trocar/estender as fases
@@ -12,6 +16,9 @@ struct ResultadoCompilacao
     QString mensagem;
     int linha = 0;   // 1-based; 0 quando não se aplica
     int coluna = 0;  // 1-based; 0 quando não se aplica
+    int avisos = 0;  // avisos do semântico (listados na mensagem)
+    // Tabela de símbolos montada pelo semântico (parcial se houve erro)
+    std::vector<Simbolo> simbolos;
 };
 
 class Compilador

@@ -1,11 +1,14 @@
 %%%VERSION 2%%%
 #Options
-GenerateScanner = false
+GenerateScanner = true
 GenerateParser = true
-Language = Python
+Language = C++
 ScannerName = Lexico
 ParserName = Sintatico
 SemanticName = Semantico
+ScannerCaseSensitive = true
+ScannerTable = Full
+Input = String
 Parser = SLR
 #RegularDefinitions
 LETRA : [a-zA-Z]
@@ -15,9 +18,15 @@ BINDIG : [01]
 #Tokens
 ID : ({LETRA}|_) ({LETRA}|{DIGITO}|_)*
 
-//COMENTÁRIOS
-SL_COMM :  [/][/][^\n\r]*
-ML_COMM :! [/][\*]+.*[\*]+[/]
+// COMENTÁRIOS - declarados SEM NOME, como os espaços em branco: um token sem nome é
+// ignorado pelo léxico e nunca chega ao sintático/semântico.
+// ":!" (documentação do Web-GALS) significa "sem retrocesso": depois de ler "/*", o léxico
+// exige o comentário inteiro; se não houver "*/", dá ERRO LÉXICO em vez de voltar e
+// devolver "/" e "*" como divisão e multiplicação.
+// comentário de linha: // até o fim da linha
+: [/][/][^\n\r]*
+// comentário de bloco: não guloso e multilinha (entre /* e */ não pode aparecer "*/")
+:! [/][\*] ( [^\*] | [\*]+ [^\*/] )* [\*]+ [/]
 
 // controle de fluxo
 IF          = ID : "si"
@@ -186,44 +195,60 @@ LIT_STR  : \" [^\"]* \"
 <func_return_st>
 <lista_func>
 #Grammar
-<exp>  ::= <exp> OR_EXT <exp1> | <exp1>;
-<exp1> ::= <exp1> AND_EXT <exp2> | <exp2>;
-<exp2> ::= <exp2> BIT_OR <exp3> | <exp3>;
-<exp3> ::= <exp3> BIT_XOR <exp4> | <exp4>;
-<exp4> ::= <exp4> BIT_AND <exp5> | <exp5>;
-<exp5> ::= <exp5> <op_rel> <exp6> | <exp6>;
-<exp6> ::= <exp6> <op_bitwise> <exp7> | <exp7>;
-<exp7> ::= <exp7> <op_arit_baixa> <exp8> | <exp8>;
-<exp8> ::= <exp8> <op_arit_alta> <exp9> | <exp9> ;
-<exp9> ::= <op_neg> <exp10> | <exp10>;
-<exp10> ::= ID
-            | LIT_FLOAT 
-            | LIT_INT 
-            | LIT_STR
-            | TRUE
-            | FALSE
-            | ID <vt_index>
-            | ID O_PARENT <call_args> C_PARENT
-            | O_PARENT <exp> C_PARENT
-            | LIT_CHAR
-            | LIT_HEX;
+// AÇÕES SEMÂNTICAS (implementadas em Semantico.cpp)
+//  1 tipo atual            2 nome declarado        3 insere declaração     4 tamanho do vetor
+// 10 busca identificador  11 uso de variável      12 uso de elemento      13 início de chamada
+// 14 fim chamada (expr)   15 fim chamada (cmd)    16 argumento            17 índice
+// 20-24 literais (atomus, fractio, caracter, catena, logicum)
+// 29 operação unária      30 empilha operador     31-39 operação binária (um número por nível
+//    de precedência: no SLR, a mesma ação em vários níveis gera conflito com o próximo operador)
+// 40 alvo variável        41 alvo elemento        42 conclui atribuição
+// 43 legere variável      44 legere elemento      45 item do inscribe
+// 50 condição             51 entra em laço        52 sai do laço          53 exi
+// 60 abre escopo          61 fecha escopo
+// 70 nome da função       71 munus (vazio)        72 nome do parâmetro    73 parâmetro vetor
+// 74 insere parâmetro     75 fim da função        76 reditus com valor    77 reditus sem valor
+// 80 início do programa   81 início do corpo      82 fim do programa
 
-<op_rel> ::= GREATER | LESS | GREAT_EQ | LESS_EQ | EQUAL | DIFF; 
-<op_neg> ::=  BIT_NOT | NOT | NOT_EXT;
-<op_bitwise> ::= SHL | SHR;
-<op_arit_baixa> ::= SUM | SUM_EXT | SUB | SUB_EXT;
-<op_arit_alta> ::=  MUL | MUL_EXT | DIV | DIV_EXT | MOD | MOD_EXT;
+<exp>  ::= <exp> OR_EXT #30 <exp1> #31 | <exp> OR #30 <exp1> #31 | <exp1>;
+<exp1> ::= <exp1> AND_EXT #30 <exp2> #32 | <exp1> AND #30 <exp2> #32 | <exp2>;
+<exp2> ::= <exp2> BIT_OR #30 <exp3> #33 | <exp3>;
+<exp3> ::= <exp3> BIT_XOR #30 <exp4> #34 | <exp4>;
+<exp4> ::= <exp4> BIT_AND #30 <exp5> #35 | <exp5>;
+<exp5> ::= <exp5> <op_rel> <exp6> #36 | <exp6>;
+<exp6> ::= <exp6> <op_bitwise> <exp7> #37 | <exp7>;
+<exp7> ::= <exp7> <op_arit_baixa> <exp8> #38 | <exp8>;
+<exp8> ::= <exp8> <op_arit_alta> <exp9> #39 | <exp9> ;
+<exp9> ::= <op_neg> <exp9> #29 | <exp10>;
+<exp10> ::= ID #10 #11
+            | ID #10 <vt_index> #12
+            | ID #10 O_PARENT #13 <call_args> C_PARENT #14
+            | LIT_INT #20
+            | LIT_HEX #20
+            | LIT_BIN #20
+            | LIT_FLOAT #21
+            | LIT_CHAR #22
+            | LIT_STR #23
+            | TRUE #24
+            | FALSE #24
+            | O_PARENT <exp> C_PARENT;
+
+<op_rel> ::= GREATER #30 | LESS #30 | GREAT_EQ #30 | LESS_EQ #30 | EQUAL #30 | DIFF #30;
+<op_neg> ::=  BIT_NOT #30 | NOT #30 | NOT_EXT #30 | SUB #30;
+<op_bitwise> ::= SHL #30 | SHR #30;
+<op_arit_baixa> ::= SUM #30 | SUM_EXT #30 | SUB #30 | SUB_EXT #30;
+<op_arit_alta> ::=  MUL #30 | MUL_EXT #30 | DIV #30 | DIV_EXT #30 | MOD #30 | MOD_EXT #30;
 
 
 
 // Comandos Disponiveis
 
-<cmd> ::=  <if_st> 
-          | <while_st> 
-          | <for_st> 
-          | <repeat_st> 
-          | <break_st> 
-          | <assign> 
+<cmd> ::=  <if_st>
+          | <while_st>
+          | <for_st>
+          | <repeat_st>
+          | <break_st>
+          | <assign>
           | <decl>
           | <read_st>
           | <write_st>
@@ -231,75 +256,77 @@ LIT_STR  : \" [^\"]* \"
           | <func_call>;
 
 
-// Agregador de comandos ( Pilha ) 
+// Agregador de comandos ( Pilha )
 
-<lista_cmd> ::= <cmd> <lista_cmd> | î ; 
+<lista_cmd> ::= <cmd> <lista_cmd> | î ;
 
 // Declaracoes de variaveis
 <var_type> ::= INT #1 | FLOAT #1 | CHAR #1 | BOOL #1 | STRING #1;
 
-<vt_size> ::= O_SQR_BRAC <exp> C_SQR_BRAC  | î  ;
-<vt_index> ::= O_SQR_BRAC <exp> C_SQR_BRAC;
+<vt_size> ::= O_SQR_BRAC <exp> C_SQR_BRAC #4 | î  ;
+<vt_index> ::= O_SQR_BRAC <exp> C_SQR_BRAC #17;
 
 <decl> ::= <var_type> <lista_ids> SEMICOLON;
 
-<lista_ids>  ::= ID #2 <vt_size> <lista_ids_x> ;
-<lista_ids_x> ::= COMMA ID <vt_size> <lista_ids_x> | î ;
+<lista_ids>  ::= ID #2 <vt_size> #3 <lista_ids_x> ;
+<lista_ids_x> ::= COMMA ID #2 <vt_size> #3 <lista_ids_x> | î ;
 
-<assign> ::= ID ASSIGN <exp> SEMICOLON | ID <vt_index> ASSIGN <exp> SEMICOLON ;
+<assign> ::= ID #10 #40 ASSIGN <exp> #42 SEMICOLON | ID #10 <vt_index> #41 ASSIGN <exp> #42 SEMICOLON ;
 
 
 // CIn e Cout
 <read_st>     ::= READ O_PARENT <lista_read> C_PARENT SEMICOLON ;
 <lista_read>  ::= <read_item> <lista_read_x> ;
 <lista_read_x> ::= COMMA <read_item> <lista_read_x> | î ;
-<read_item>   ::= ID | ID <vt_index> ;
+<read_item>   ::= ID #10 #43 | ID #10 <vt_index> #44 ;
 
 <write_st>    ::= WRITE O_PARENT <lista_write> C_PARENT SEMICOLON ;
-<lista_write> ::= <exp> <lista_write_x> ;
-<lista_write_x> ::= COMMA <exp> <lista_write_x> | î ;
+<lista_write> ::= <exp> #45 <lista_write_x> ;
+<lista_write_x> ::= COMMA <exp> #45 <lista_write_x> | î ;
 
 // Bloco de operacoes
 
-<op_block> ::= O_CUR_BRAC <lista_cmd> C_CUR_BRAC | O_CB_EXT <lista_cmd> C_CB_EXT;
+<op_block> ::= O_CUR_BRAC #60 <lista_cmd> C_CUR_BRAC #61 | O_CB_EXT #60 <lista_cmd> C_CB_EXT #61;
 
 
-<if_st> ::= IF O_PARENT <exp> C_PARENT DO <op_block> <elif_st>;
+<if_st> ::= IF O_PARENT <exp> C_PARENT #50 DO <op_block> <elif_st>;
 <elif_st> ::= ELSE <else_st> | î ;
 <else_st> ::= <if_st> | <op_block>;
 
 
-<while_st> ::= WHILE O_PARENT <exp> C_PARENT DO <op_block>;
+<while_st> ::= WHILE #51 O_PARENT <exp> C_PARENT #50 DO <op_block> #52;
 
-<for_st> ::= FOR O_PARENT <for_init> SEMICOLON <exp> SEMICOLON <for_pos> C_PARENT DO <op_block> ;
-<for_init> ::= ID ASSIGN <exp> ;
-<for_pos>  ::= ID ASSIGN <exp>;
+<for_st> ::= FOR #51 O_PARENT <for_init> SEMICOLON <exp> #50 SEMICOLON <for_pos> C_PARENT DO <op_block> #52 ;
+<for_init> ::= ID #10 #40 ASSIGN <exp> #42 ;
+<for_pos>  ::= ID #10 #40 ASSIGN <exp> #42 ;
 
-<repeat_st> ::= REPEAT <op_block> UNTIL O_PARENT <exp> C_PARENT SEMICOLON ;
-<break_st> ::= BREAK SEMICOLON ;
+<repeat_st> ::= REPEAT #51 <op_block> UNTIL O_PARENT <exp> C_PARENT #50 SEMICOLON #52 ;
+<break_st> ::= BREAK #53 SEMICOLON ;
 
 // Functions
-<func_def> ::= FUNCTION ID O_PARENT <func_params> C_PARENT <func_block>;
+// opus <tipo> nome(...) devolve valor; munus nome(...) é procedimento (sem retorno)
+<func_def> ::= FUNCTION <var_type> ID #70 O_PARENT <func_params> C_PARENT <func_block> #75
+             | PROCEDURE #71 ID #70 O_PARENT <func_params> C_PARENT <func_block> #75;
 
 <func_block> ::= O_CB_EXT <lista_cmd> C_CB_EXT ;
 
 <func_params>    ::= <param> <func_params_x> | î ;
 <func_params_x>  ::= COMMA <param> <func_params_x> | î ;
 
-<param>     ::= <var_type> ID <param_vetor> ;
-<param_vetor> ::= O_SQR_BRAC C_SQR_BRAC | î ;
+<param>     ::= <var_type> ID #72 <param_vetor> #74 ;
+<param_vetor> ::= O_SQR_BRAC C_SQR_BRAC #73 | î ;
 
 
-<call_args>    ::= <exp> <call_args_x> | î ;
-<call_args_x>  ::= COMMA <exp> <call_args_x> | î ;
+<call_args>    ::= <exp> #16 <call_args_x> | î ;
+<call_args_x>  ::= COMMA <exp> #16 <call_args_x> | î ;
 
-<func_call> ::= ID O_PARENT <call_args> C_PARENT SEMICOLON;
-<func_return_st> ::= RETURN <exp> SEMICOLON ;
+<func_call> ::= ID #10 O_PARENT #13 <call_args> C_PARENT #15 SEMICOLON;
+<func_return_st> ::= RETURN <exp> SEMICOLON #76 | RETURN SEMICOLON #77 ;
 <lista_func> ::= <func_def> <lista_func> | î ;
 
 
 //bloco inicial
-<programa> ::= BEGIN <lista_func> <lista_cmd> END;
+<programa> ::= BEGIN #80 <lista_func> #81 <lista_cmd> END #82;
 
 
 

@@ -15,9 +15,15 @@ set(GALS_SOURCES
     Constants.cpp Constants.h
     Lexico.cpp Lexico.h
     Sintatico.cpp Sintatico.h
-    Semantico.cpp Semantico.h
     Token.h
     AnalysisError.h LexicalError.h SyntacticError.h SemanticError.h
+)
+
+# Analisador semântico (escrito à mão; o GALS gera um Semantico.* vazio, não copie por cima)
+set(SEMANTICO_SOURCES
+    Semantico.cpp Semantico.h
+    TabelaSimbolos.cpp TabelaSimbolos.h
+    Tipos.h SemanticTable.h
 )
 
 # Arquivos da IDE
@@ -25,9 +31,10 @@ set(IDE_SOURCES
     main.cpp
     MainWindow.cpp MainWindow.h
     Compilador.cpp Compilador.h
+    Estandarte.cpp Estandarte.h
 )
 
-add_executable(CompiladorIDE ${IDE_SOURCES} ${GALS_SOURCES})
+add_executable(CompiladorIDE ${IDE_SOURCES} ${GALS_SOURCES} ${SEMANTICO_SOURCES})
 
 target_link_libraries(CompiladorIDE PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 
@@ -42,6 +49,8 @@ qt_add_resources(CompiladorIDE "recursos"
         fontes/Alegreya-VariableFont_wght.ttf
         fontes/Almendra-Regular.ttf
         imagens/papiro.jpg
+        imagens/marmore.jpg
+        imagens/tecido.jpg
 )
 
 if(MSVC)
@@ -68,3 +77,14 @@ if(WIN32)
         )
     endif()
 endif()
+
+# Testes automáticos, sem Qt: roda todos os casos de casos_de_teste.txt
+#   cmake --build build --target testar
+add_executable(rodar_casos EXCLUDE_FROM_ALL testes/rodar_casos.cpp ${GALS_SOURCES} ${SEMANTICO_SOURCES})
+target_include_directories(rodar_casos PRIVATE ${CMAKE_SOURCE_DIR})
+add_custom_target(testar
+    COMMAND rodar_casos "${CMAKE_SOURCE_DIR}/casos_de_teste.txt"
+    DEPENDS rodar_casos
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    USES_TERMINAL
+)
