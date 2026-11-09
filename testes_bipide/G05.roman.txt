@@ -1,0 +1,6 @@
+principium
+  atomus a, b, v[2];
+  legere(a, b);
+  v[1] = a;
+  inscribe(a & b, a | b, a ^ b, ~a, v[1] & 0x0F | b << 3, a >> 1, -v[1]);
+terminus

@@ -1,0 +1,10 @@
+principium
+  atomus a, b, v[4];
+  a = 7;
+  b = a;
+  v[0] = b;
+  v[a - 6] = 300;
+  v[v[1] - 298] = v[0] + v[1];
+  v[3] = -5;
+  inscribe(a, b, v[0], v[1], v[2], v[3]);
+terminus

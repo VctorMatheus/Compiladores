@@ -1,0 +1,5 @@
+principium
+  atomus a;
+  a = 40000;
+  inscribe(a);
+terminus

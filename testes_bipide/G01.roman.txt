@@ -1,0 +1,6 @@
+principium
+  atomus a, v[4];
+  caracter c;
+  logicum l;
+  inscribe(55, a, v[3], 0x1F, 0b101, 'Z', verum, falsus);
+terminus

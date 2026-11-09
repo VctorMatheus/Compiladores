@@ -1,0 +1,6 @@
+principium
+  atomus a, v[2 * 5];
+  a = 3 * 4;
+  v[9] = 10;
+  inscribe(a, 10 / 3, 7 % 4, 2 < 3, v[9]);
+terminus
