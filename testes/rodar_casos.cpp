@@ -2,12 +2,18 @@
 // sem a interface Qt. Uso:
 //
 //   rodar_casos <casos_de_teste.txt> [-v]    roda todos os casos (-v mostra também os que passam)
-//   rodar_casos -p <programa.txt>             analisa um programa e mostra o resultado
+//   rodar_casos -p <programa.txt> [entradas]  analisa um programa e mostra o resultado, a tabela
+//                                             de símbolos e o assembly; com entradas ("5 3"),
+//                                             executa o assembly no simulador do BIP
 //
 // Formato de cada caso no arquivo:
 //
 //   === NOME DO CASO
 //   ESPERADO: SUCESSO | AVISO (linha N) | ERRO LÉXICO/SINTÁTICO/SEMÂNTICO (linha N)
+//   ENTRADA: 5 3            (opcional) valores lidos de $in_port pelo legere
+//   SAIDA: 8 2              (opcional) o assembly gerado, executado no simulador do BIP
+//                           (testes/simulador_bip.h), deve escrever exatamente isto em $out_port
+//   GERACAO: NAO (linha N)  (opcional) o programa compila, mas o assembly não é gerado
 //   ---
 //   <código até o próximo "===" ou "####">
 //
@@ -19,6 +25,7 @@
 #include "LexicalError.h"
 #include "SyntacticError.h"
 #include "SemanticError.h"
+#include "simulador_bip.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -37,6 +44,9 @@ struct Resultado
     std::string mensagem;
     std::vector<std::pair<int, std::string>> avisos;   // (linha, mensagem)
     std::vector<Simbolo> simbolos;
+    std::string assembly;         // vazio se não foi gerado
+    std::string semAssembly;      // motivo de não ter sido gerado
+    int linhaSemAssembly = 0;
 };
 
 int linhaDe(const std::string &fonte, int posicao)
@@ -76,7 +86,65 @@ Resultado analisar(const std::string &fonte)
     std::stable_sort(r.avisos.begin(), r.avisos.end(),
                      [](const auto &a, const auto &b) { return a.first < b.first; });
     r.simbolos = semantico.getSimbolos();
+
+    if (r.fase == "SUCESSO") {
+        const GeradorBIP &g = semantico.getGerador();
+        if (g.ativo()) {
+            r.assembly = g.assembly();
+        } else {
+            r.semAssembly = g.getMotivo();
+            r.linhaSemAssembly = linhaDe(fonte, g.getPosicaoMotivo());
+        }
+    }
     return r;
+}
+
+std::vector<long long> numeros(const std::string &texto)
+{
+    std::vector<long long> v;
+    std::istringstream in(texto);
+    long long x;
+    while (in >> x)
+        v.push_back(x);
+    return v;
+}
+
+std::string juntar(const std::vector<long long> &v)
+{
+    std::string s;
+    for (long long x : v)
+        s += (s.empty() ? "" : " ") + std::to_string(x);
+    return s;
+}
+
+// Confere ENTRADA/SAIDA/GERACAO; devolve "" se está tudo certo, senão o problema
+std::string confereGeracao(const Resultado &r, const std::string &entrada,
+                           const std::string &saida, const std::string &geracao)
+{
+    if (!geracao.empty()) {
+        const auto p = geracao.find("linha ");
+        const std::string linha = p == std::string::npos ? ""
+            : geracao.substr(p + 6, geracao.find(')', p) - p - 6);
+        if (!r.assembly.empty())
+            return "o assembly foi gerado, mas não deveria";
+        if (!linha.empty() && std::to_string(r.linhaSemAssembly) != linha)
+            return "assembly não gerado na linha " + std::to_string(r.linhaSemAssembly) +
+                   " (esperado na linha " + linha + "): " + r.semAssembly;
+        return "";
+    }
+    if (saida.empty())
+        return "";
+    if (r.assembly.empty())
+        return "assembly não gerado (linha " + std::to_string(r.linhaSemAssembly) + "): " +
+               r.semAssembly;
+
+    const ExecucaoBIP e = executarBIP(r.assembly, numeros(entrada));
+    if (!e.ok)
+        return "simulador do BIP: " + e.erro;
+    if (juntar(e.saidas) != juntar(numeros(saida)))
+        return "saída do simulador: " + juntar(e.saidas) + " (esperado " +
+               juntar(numeros(saida)) + ")";
+    return "";
 }
 
 std::string descrever(const Resultado &r)
@@ -144,12 +212,23 @@ int main(int argc, char **argv)
             std::cout << "  " << s.nome << " | " << nomeTipo(s.tipo) << " | " << modalidade(s)
                       << " | " << s.escopo << " | ini=" << s.inicializado << " usado=" << s.usado
                       << " | param=" << s.posicaoParametro << " | tam=" << s.tamanho << "\n";
+        if (!r.assembly.empty()) {
+            std::cout << "\nAssembly:\n" << r.assembly;
+            if (argc > 3) {
+                const ExecucaoBIP e = executarBIP(r.assembly, numeros(argv[3]));
+                std::cout << "\nSimulador: " << (e.ok ? "saída = " + juntar(e.saidas) : e.erro)
+                          << "\n";
+            }
+        } else if (!r.semAssembly.empty()) {
+            std::cout << "\nAssembly não gerado (linha " << r.linhaSemAssembly << "): "
+                      << r.semAssembly << "\n";
+        }
         return 0;
     }
 
     const bool detalhado = argc > 2 && std::string(argv[2]) == "-v";
     std::istringstream entrada(lerArquivo(argv[1]));
-    std::string linha, nome, esperado, codigo;
+    std::string linha, nome, esperado, codigo, entradaBip, saidaBip, geracao;
     bool lendoCodigo = false;
     int ok = 0, falhas = 0;
 
@@ -160,15 +239,24 @@ int main(int argc, char **argv)
             codigo.pop_back();
 
         const Resultado r = analisar(codigo);
-        const bool passou = confere(esperado, r);
+        const std::string problemaGeracao = confereGeracao(r, entradaBip, saidaBip, geracao);
+        const bool passou = confere(esperado, r) && problemaGeracao.empty();
         (passou ? ok : falhas)++;
-        if (!passou || detalhado)
+        if (!passou || detalhado) {
             std::cout << (passou ? "ok    " : "FALHA ") << nome
                       << "\n      esperado: " << esperado
                       << "\n      obtido:   " << descrever(r) << "\n";
+            if (!problemaGeracao.empty())
+                std::cout << "      geração:  " << problemaGeracao << "\n";
+            if (!problemaGeracao.empty() && !r.assembly.empty())
+                std::cout << r.assembly << "\n";
+        }
 
         nome.clear();
         codigo.clear();
+        entradaBip.clear();
+        saidaBip.clear();
+        geracao.clear();
         lendoCodigo = false;
     };
 
@@ -184,6 +272,12 @@ int main(int argc, char **argv)
         } else if (!nome.empty() && !lendoCodigo) {
             if (linha.rfind("ESPERADO:", 0) == 0)
                 esperado = linha.substr(10);
+            else if (linha.rfind("ENTRADA:", 0) == 0)
+                entradaBip = linha.substr(8);
+            else if (linha.rfind("SAIDA:", 0) == 0)
+                saidaBip = linha.substr(6);
+            else if (linha.rfind("GERACAO:", 0) == 0)
+                geracao = linha.substr(8);
             else if (linha == "---")
                 lendoCodigo = true;
         } else if (lendoCodigo) {

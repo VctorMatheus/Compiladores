@@ -11,7 +11,13 @@ A especificação e os slides ficam fora do repositório, na pasta acima (`..\Es
 T1 léxico (18/08) · T2 IDE + sintático (15/09; fonte 14 no editor e nas mensagens) ·
 **T3 semântico (20/10/2026)**: tabela de símbolos com tipo/modalidade/escopo, escopos sem vazamento, unicidade,
 avisos de não usado e de não inicializado, **tabela visível na IDE**, compatibilidade de tipos ·
-T4 a T6: geração de código para o processador **BIP** (Bipide 3.0), com aba de assembly na IDE (10/11, 01/12, 09/12).
+**T4 (10/11)**: assembly do BIP (Bipide 3.0) para declarações, entrada/saída, atribuições,
+soma/subtração/bit a bit com variáveis e vetores + aba de asm na IDE ·
+**T5 (01/12)**: relacionais, si, si/aliter, dum, iterum, pro, aninhamento ·
+**T6 (09/12)**: sub-rotinas (CALL), parâmetros por cópia, retorno em expressões, compatibilidade de
+parâmetros. **Multiplicação/divisão não são pedidas em nenhuma etapa** (o usuário vai decidir com os
+colegas se fazem por software). Material do BIP: slides "Conjunto de Instruções da Arquitetura BIP" e
+"GCOD1 BIP SEQ" (esquema do professor: ações com `gera_cod`, temporários 1000+, `$indr`/`LDV`/`STOV`).
 
 ## Arquitetura em uma linha por parte
 
@@ -20,9 +26,14 @@ T4 a T6: geração de código para o processador **BIP** (Bipide 3.0), com aba d
 - `SemanticTable.h`: tabela de compatibilidade no **formato do professor** (`expTable`, `atribTable`,
   `resultType`, `atribType`), preenchida com as regras estilo C + coluna `BIT`. É a única fonte das regras
   de tipo das operações e atribuições; o `Semantico` só traduz `Tipo` ↔ índice e explica os erros.
-- `Compilador.*`: ponte IDE ↔ analisadores (posição → linha/coluna, lista de avisos).
-- `MainWindow.*`, `Estandarte.*`, `main.cpp`: interface (abas Saída e Tabela de Símbolos).
-- `casos_de_teste.txt` + `testes/rodar_casos.cpp`: testes automáticos.
+- `GeradorBIP.*`: geração do assembly do BIP, chamada pelo `Semantico` **depois** de validar cada
+  ação (mesma numeração `#n`). Pilha de operandos paralela à `pilhaTipos` (Imediato / Memória /
+  Acumulador): literais e variáveis são "preguiçosos", o ACC só vai para temporário quando preciso.
+- `Compilador.*`: ponte IDE ↔ analisadores (posição → linha/coluna, lista de avisos, assembly).
+- `MainWindow.*`, `Estandarte.*`, `main.cpp`: interface (abas Saída, Tabela de Símbolos, Assembly;
+  botão Salvar .asm).
+- `casos_de_teste.txt` + `testes/rodar_casos.cpp`: testes automáticos; `testes/simulador_bip.h`
+  executa o asm gerado nos casos com `SAIDA:`.
 
 ## Como validar qualquer mudança
 
@@ -31,7 +42,8 @@ cmake --build build --target testar
 ```
 
 Roda todos os casos do `casos_de_teste.txt` sem Qt e sai com código 1 se algum falhar. Para um programa
-avulso: `build/rodar_casos -p programa.txt` (mostra também a tabela de símbolos).
+avulso: `build/rodar_casos -p programa.txt "5 3"` (mostra a tabela de símbolos, o assembly e, com
+entradas, o que o simulador do BIP escreve).
 Se a IDE estiver aberta, o link do `CompiladorIDE.exe` falha com "Permission denied": feche a IDE antes. Ao mudar regras, **acrescente casos** ao `casos_de_teste.txt`
 (formato no topo de `testes/rodar_casos.cpp`; `AVISO (linha N)` = compila com aviso naquela linha).
 
@@ -79,6 +91,24 @@ Se a IDE estiver aberta, o link do `CompiladorIDE.exe` falha com "Permission den
   uso sem valor (pela ordem do texto, pode dar
   falso positivo em laços), função sem `reditus`, índice constante fora dos limites, divisão por zero.
   `legere(x)` marca `x` como inicializada, mas não como usada.
+
+### Geração de código (BIP)
+
+- O que o BIP não tem ou ainda não foi feito **não é erro de compilação**: o `GeradorBIP` guarda o
+  primeiro motivo (`naoSuportado`), para de gerar, e a IDE mostra o motivo na Saída e na aba Assembly.
+  Assim os casos antigos com `si`/funções continuam compilando. Nos testes: `GERACAO: NAO (linha N)`.
+- Não gerado: `*`, `/`, `%` entre não constantes; `<<`/`>>` por variável (`SLL`/`SRL` só têm
+  imediato); `fractio`/`catena` (declaração, literal ou texto no `inscribe`); por enquanto (T5/T6)
+  relacionais, lógicos, `si` (#50), laços (#51) e funções/chamadas (#70/#13).
+- Constantes: se o `Semantico` marcou o resultado como constante, o gerador usa o valor (por isso
+  `v[2 * 5]` e `a = 3 * 4` funcionam). Imediato do BIP: −1024..1023; fora disso vira
+  `const_N : N` no `.data`. Tudo em 16 bits com sinal (`GeradorBIP::palavra`); literal > 32767 gera aviso.
+- Nomes no `.data`: o nome original; se repetir ou for mnemônico (`add`, `sub`...), ganha `_escopo`.
+- Temporários: 1000, 1001... (reutilizados; liberados quando o operando é consumido). Índice de vetor
+  que recebe atribuição fica guardado (temporário ou variável) enquanto o lado direito é calculado.
+- Não verificado no Bipide real (só no simulador dos testes): sintaxe `NOT 0`, vírgulas no vetor do
+  `.data`, nomes `const_N`. `>>` gera `SRL` (lógico), enquanto a conta entre constantes do semântico é
+  aritmética: diferem só para negativos.
 
 ## Pendências
 

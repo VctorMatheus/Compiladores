@@ -3,11 +3,14 @@
 #include "Estandarte.h"
 #include "TabelaSimbolos.h"
 
+#include <QFile>
+#include <QFileDialog>
 #include <QFontMetricsF>
 #include <QFrame>
 #include <QHeaderView>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QShortcut>
@@ -17,6 +20,7 @@
 #include <QSplitter>
 #include <QTextBlock>
 #include <QTextCursor>
+#include <QTextStream>
 #include <QVBoxLayout>
 
 MainWindow::MainWindow(QWidget *parent)
@@ -68,6 +72,7 @@ MainWindow::MainWindow(QWidget *parent)
         QPushButton:hover   { background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
                               stop:0 #a5813a, stop:0.5 #826027, stop:1 #5e4417); }
         QPushButton:pressed { background: #4e3812; }
+        QPushButton:disabled { color: #b9a77e; background: #5a4a2a; border-color: #8a7a5c; }
 
         QPlainTextEdit {
             color: #3b2410;
@@ -134,6 +139,13 @@ MainWindow::MainWindow(QWidget *parent)
     auto *atalho = new QShortcut(QKeySequence(Qt::Key_F5), this);
     connect(atalho, &QShortcut::activated, this, &MainWindow::compilar);
 
+    botaoSalvar = new QPushButton(QStringLiteral("Salvar .asm"));
+    botaoSalvar->setFont(fonteBotao);
+    botaoSalvar->setCursor(Qt::PointingHandCursor);
+    botaoSalvar->setEnabled(false);
+    botaoSalvar->setToolTip(QStringLiteral("Salva o assembly gerado para abrir no Bipide"));
+    connect(botaoSalvar, &QPushButton::clicked, this, &MainWindow::salvarAssembly);
+
     auto *colunas = new Estandarte;  // estandarte entre colunas jônicas
     colunas->setFixedWidth(316);
     auto *layoutEstandarte = new QVBoxLayout(colunas);
@@ -145,6 +157,8 @@ MainWindow::MainWindow(QWidget *parent)
     layoutEstandarte->addWidget(divisor);
     layoutEstandarte->addSpacing(18);
     layoutEstandarte->addWidget(botaoCompilar);
+    layoutEstandarte->addSpacing(8);
+    layoutEstandarte->addWidget(botaoSalvar);
     layoutEstandarte->addStretch();
 
     // --- Seções (direita): código e saída, emolduradas em mármore ---
@@ -197,6 +211,16 @@ MainWindow::MainWindow(QWidget *parent)
     abas->addTab(saida, QStringLiteral("Saída"));
     abas->addTab(tabela, QStringLiteral("Tabela de Símbolos"));
 
+    // Assembly do BIP (requisito do T4): fonte de largura fixa para alinhar as instruções
+    assembly = new QPlainTextEdit;
+    QFont fonteAssembly(QStringLiteral("Consolas"), 13);
+    fonteAssembly.setStyleHint(QFont::Monospace);
+    assembly->setFont(fonteAssembly);
+    assembly->setReadOnly(true);
+    assembly->setLineWrapMode(QPlainTextEdit::NoWrap);
+    assembly->setPlaceholderText(QStringLiteral("Compile o programa para ver o assembly do BIP."));
+    abas->addTab(assembly, QStringLiteral("Assembly"));
+
     auto *splitter = new QSplitter(Qt::Vertical);
     splitter->setHandleWidth(12);
     splitter->addWidget(criarMoldura(editor));
@@ -228,6 +252,14 @@ void MainWindow::compilar()
     saida->setPlainText(r.mensagem);
     preencherTabela(r.simbolos);
 
+    if (!r.assembly.isEmpty())
+        assembly->setPlainText(r.assembly);
+    else if (!r.semAssembly.isEmpty())
+        assembly->setPlainText(QStringLiteral("Código assembly não gerado.\n\n") + r.semAssembly);
+    else
+        assembly->setPlainText(QStringLiteral("Código assembly não gerado: o programa tem erros."));
+    botaoSalvar->setEnabled(!r.assembly.isEmpty());
+
     // Em caso de erro, posiciona o cursor do editor no local indicado
     if (!r.sucesso)
         abas->setCurrentWidget(saida);
@@ -241,6 +273,23 @@ void MainWindow::compilar()
             editor->setFocus();
         }
     }
+}
+
+void MainWindow::salvarAssembly()
+{
+    const QString caminho = QFileDialog::getSaveFileName(
+        this, QStringLiteral("Salvar assembly"), QStringLiteral("programa.asm"),
+        QStringLiteral("Assembly do BIP (*.asm);;Todos os arquivos (*)"));
+    if (caminho.isEmpty())
+        return;
+
+    QFile arquivo(caminho);
+    if (!arquivo.open(QIODevice::WriteOnly | QIODevice::Text | QIODevice::Truncate)) {
+        QMessageBox::warning(this, QStringLiteral("Salvar assembly"),
+                             QStringLiteral("Não foi possível salvar em %1").arg(caminho));
+        return;
+    }
+    QTextStream(&arquivo) << assembly->toPlainText();
 }
 
 void MainWindow::preencherTabela(const std::vector<Simbolo> &simbolos)

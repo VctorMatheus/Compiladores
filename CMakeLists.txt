@@ -24,6 +24,7 @@ set(SEMANTICO_SOURCES
     Semantico.cpp Semantico.h
     TabelaSimbolos.cpp TabelaSimbolos.h
     Tipos.h SemanticTable.h
+    GeradorBIP.cpp GeradorBIP.h
 )
 
 # Arquivos da IDE

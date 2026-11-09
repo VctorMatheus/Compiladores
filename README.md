@@ -30,8 +30,9 @@ terminus
 | `Lexico.*`, `Sintatico.*`, `Constants.*`, `Token.h`, `*Error.h` | Código gerado pelo GALS |
 | `Semantico.*`, `TabelaSimbolos.*`, `Tipos.h` | Analisador semântico (tipos, escopos, funções, avisos) |
 | `SemanticTable.h` | Tabela de compatibilidade de tipos (modelo do professor, preenchido para a Roman++) |
+| `GeradorBIP.*` | Geração de código assembly para o processador BIP (Bipide 3.0) |
 | `Compilador.*` | Ponte entre a IDE e os analisadores (erros → linha/coluna) |
-| `MainWindow.*`, `main.cpp` | Interface: editor, botão Compilar e abas Saída / Tabela de Símbolos |
+| `MainWindow.*`, `main.cpp` | Interface: editor, botões Compilar e Salvar .asm, abas Saída / Tabela de Símbolos / Assembly |
 | `fontes/` | Fontes embutidas (Cinzel, Marcellus SC, Almendra, Alegreya — licença SIL OFL) |
 | `imagens/` | Fundo de papiro e o script Python que o gera |
 | `casos_de_teste.txt` | Cenários de sucesso, de erro léxico/sintático/semântico e de avisos |
@@ -55,6 +56,14 @@ O build roda o `windeployqt` automaticamente, então `build/CompiladorIDE.exe` a
 
 ```bash
 cmake --build build --target testar
+```
+
+Os casos de geração de código (`G..`) executam o assembly gerado num simulador do BIP
+(`testes/simulador_bip.h`) e comparam o que sai em `$out_port`. Para ver o assembly de um programa
+e executá-lo com entradas:
+
+```bash
+build/rodar_casos -p programa.txt "5 3"
 ```
 
 ## Regenerando os analisadores
@@ -88,3 +97,42 @@ ação no fim de produções diferentes; por isso cada nível de precedência da
 - **Tabela de símbolos:** a aba *Tabela de Símbolos* da IDE mostra, a cada compilação, todos os identificadores
   (programa, funções, parâmetros, variáveis e vetores) com tipo, modalidade, escopo (`global`, `principal`,
   nome da função, `principal1`... para blocos), inicialização, uso, posição do parâmetro e tamanho do vetor.
+
+## Geração de código para o BIP
+
+A cada compilação sem erros, a aba *Assembly* mostra o programa para o processador BIP, pronto para o
+Bipide 3.0 (o botão *Salvar .asm* grava o arquivo). O código é gerado pelas mesmas ações semânticas,
+no formato dos slides da disciplina:
+
+```
+principium                         .data
+  atomus x, v[3];                     x : 0
+  legere(x);                          v : 0, 0, 0
+  v[1] = x + 2;                    .text
+  inscribe(v[1]);                  _PRINCIPAL:
+terminus                              LD $in_port
+                                      STO x
+                                      LD x
+                                      ADDI 2
+                                      STO 1000
+                                      LDI 1
+                                      STO $indr
+                                      LD 1000
+                                      STOV v
+                                      ...
+                                      HLT 0
+```
+
+- **Gerado:** declarações (`.data`, vetores com um `0` por posição), `legere` e `inscribe` com
+  variáveis, vetores e inteiros, atribuições a variáveis e a vetores, `+`, `-`, `&`, `|`, `^`, `~`,
+  `-` unário e `<<`/`>>` por constante (`SLL`/`SRL`).
+- **Operandos:** literais e variáveis só viram código quando o operador é aplicado, o que permite as
+  formas imediatas (`x + 1` → `LD x` / `ADDI 1`). Resultados intermediários ficam no acumulador e vão
+  para temporários (endereços 1000, 1001...) só quando necessário. Contas entre constantes são feitas
+  pelo compilador (`v[2 * 5]`, `a = 3 * 4`).
+- **16 bits:** o imediato do BIP vai de −1024 a 1023; constantes maiores viram uma posição do `.data`
+  (`const_2000 : 2000`). Literais fora de 16 bits geram aviso.
+- **Não gerado** (o programa compila e a IDE explica o motivo no lugar do assembly): `*`, `/` e `%`
+  entre variáveis (o BIP não tem essas instruções), deslocamento por variável, `fractio` e `catena`
+  (o BIP só trabalha com inteiros) e, por enquanto, relacionais, lógicos, `si`, laços e funções
+  (etapas T5 e T6).

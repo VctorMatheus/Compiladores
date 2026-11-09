@@ -135,6 +135,7 @@ void Semantico::executeAction(int action, const Token *token)
             erro("O tamanho do vetor " + vetor + " deve ser maior que zero", posicaoPendente);
         vetorPendente = true;
         tamanhoPendente = t.valor;
+        gerador.descartar();   // o tamanho é constante: não vira código
         break;
     }
 
@@ -142,7 +143,10 @@ void Semantico::executeAction(int action, const Token *token)
     case 10: pilhaIds.push_back({ buscar(lexema, pos), pos }); break;
     case 11: usarVariavel(token); break;
     case 12: usarElemento(); break;
-    case 13: iniciarChamada(); break;
+    case 13:
+        iniciarChamada();
+        gerador.naoSuportado("Chamadas de função ainda não geram código", pos);
+        break;
     case 14: finalizarChamada(true, token); break;
     case 15: finalizarChamada(false, token); break;
     case 16: argumento(token); break;
@@ -150,20 +154,30 @@ void Semantico::executeAction(int action, const Token *token)
 
     // ---- literais ----
     case 20: literalInteiro(token); break;
-    case 21: pilhaTipos.push_back({ Tipo::Fractio }); break;
+    case 21:
+        pilhaTipos.push_back({ Tipo::Fractio });
+        gerador.naoSuportado("O processador BIP só trabalha com inteiros: " + entreAspas(lexema) +
+                             " é fractio", pos);
+        break;
     case 22: {
         TipoExp t{ Tipo::Caracter };
         t.constante = true;
         t.valor = static_cast<unsigned char>(lexema.size() > 1 ? lexema[1] : 0);
         pilhaTipos.push_back(t);
+        gerador.imediato(t.valor);
         break;
     }
-    case 23: pilhaTipos.push_back({ Tipo::Catena }); break;
+    case 23:
+        pilhaTipos.push_back({ Tipo::Catena });
+        gerador.naoSuportado("O processador BIP só escreve números: o texto " + lexema +
+                             " (catena) não pode ser gerado", pos);
+        break;
     case 24: {
         TipoExp t{ Tipo::Logicum };
         t.constante = true;
         t.valor = (lexema == "verum") ? 1 : 0;
         pilhaTipos.push_back(t);
+        gerador.imediato(t.valor);
         break;
     }
 
@@ -184,8 +198,14 @@ void Semantico::executeAction(int action, const Token *token)
     case 45: itemInscribe(token); break;
 
     // ---- controle de fluxo ----
-    case 50: condicao(token); break;
-    case 51: ++profundidadeLaco; break;
+    case 50:
+        condicao(token);
+        gerador.naoSuportado("O desvio condicional (si) ainda não gera código", pos);
+        break;
+    case 51:
+        ++profundidadeLaco;
+        gerador.naoSuportado("O laço " + entreAspas(lexema) + " ainda não gera código", pos);
+        break;
     case 52: --profundidadeLaco; break;
     case 53:
         if (profundidadeLaco == 0)
@@ -197,7 +217,11 @@ void Semantico::executeAction(int action, const Token *token)
     case 61: fecharEscopo(); break;
 
     // ---- funções ----
-    case 70: iniciarFuncao(token); break;
+    case 70:
+        iniciarFuncao(token);
+        gerador.naoSuportado("Funções e procedimentos (" + entreAspas(lexema) +
+                             ") ainda não geram código", pos);
+        break;
     case 71: tipoAtual = Tipo::Vazio; break;
     case 72:
         nomeParametro = lexema;
@@ -231,6 +255,7 @@ void Semantico::executeAction(int action, const Token *token)
     case 82:
         fecharEscopo();
         fecharEscopo();
+        gerador.finalizar();
         break;
 
     default:
@@ -250,12 +275,14 @@ void Semantico::declararVariavel()
     s.tamanho = tamanhoPendente;
     s.posicao = posicaoPendente;
 
-    if (!tabela.inserir(s)) {
+    const Simbolo *inserido = tabela.inserir(s);
+    if (!inserido) {
         const Simbolo *existente = tabela.buscarNoEscopoAtual(s.nome);
         if (existente && existente->categoria == Categoria::Parametro)
             erro(entreAspas(s.nome) + " já é um parâmetro desta função", s.posicao);
         erro(entreAspas(s.nome) + " já foi declarado neste escopo", s.posicao);
     }
+    gerador.declarar(inserido, s.posicao);
 }
 
 void Semantico::abrirEscopo(const std::string &rotulo)
@@ -323,6 +350,7 @@ void Semantico::usarVariavel(const Token *token)
         s->avisoSemValor = true;
     }
     pilhaTipos.push_back(t);
+    gerador.variavel(s);
 }
 
 void Semantico::usarElemento()
@@ -335,6 +363,7 @@ void Semantico::usarElemento()
 
     s->usado = true;
     pilhaTipos.push_back({ s->tipo });
+    gerador.elemento(s);   // o índice já está na pilha do gerador
 }
 
 void Semantico::verificarIndice(const Token *token)
@@ -439,6 +468,13 @@ void Semantico::literalInteiro(const Token *token)
         erro("O literal inteiro " + lex + " é grande demais", token->getPosition());
     }
     pilhaTipos.push_back(t);
+
+    // O BIP trabalha com palavras de 16 bits com sinal
+    if (gerador.ativo() && t.valor > 32767)
+        aviso("O literal " + lex + " não cabe nos 16 bits do BIP (-32768 a 32767) e vira " +
+                  std::to_string(GeradorBIP::palavra(t.valor)) + " no código gerado",
+              token->getPosition());
+    gerador.imediato(t.valor);
 }
 
 void Semantico::operacaoBinaria()
@@ -471,6 +507,7 @@ void Semantico::operacaoBinaria()
         r.valor = calcular(o, a.valor, b.valor);
     }
     pilhaTipos.push_back(r);
+    gerador.binaria(o, op.posicao, r);
 }
 
 void Semantico::operacaoUnaria()
@@ -499,6 +536,7 @@ void Semantico::operacaoUnaria()
         r.valor = (o == "-") ? -a.valor : (o == "~") ? ~a.valor : !a.valor;
     }
     pilhaTipos.push_back(r);
+    gerador.unaria(o, op.posicao, r);
 }
 
 TipoExp Semantico::desempilharTipo()
@@ -533,6 +571,7 @@ void Semantico::alvoVariavel()
              " inteiro; use um índice, como " + s->nome + "[0]", id.posicao);
 
     pilhaAlvos.push_back({ id.simbolo, s->tipo, id.posicao });
+    gerador.alvoVariavel(s);
 }
 
 void Semantico::alvoElemento()
@@ -544,6 +583,7 @@ void Semantico::alvoElemento()
         erro(entreAspas(s->nome) + " não é um vetor", id.posicao);
 
     pilhaAlvos.push_back({ id.simbolo, s->tipo, id.posicao });
+    gerador.alvoElemento(s);   // o índice já está na pilha do gerador
 }
 
 void Semantico::concluirAtribuicao()
@@ -558,6 +598,7 @@ void Semantico::concluirAtribuicao()
     verificarCompatibilidade(alvo.tipo, t, "na atribuição a " + entreAspas(alvo.simbolo->nome),
                              alvo.posicao);
     alvo.simbolo->inicializado = true;
+    gerador.atribuir();
 }
 
 void Semantico::legere(bool elemento)
@@ -573,6 +614,10 @@ void Semantico::legere(bool elemento)
         erro(entreAspas(s->nome) + " não é um vetor", id.posicao);
 
     s->inicializado = true;
+    if (elemento)
+        gerador.lerElemento(s);
+    else
+        gerador.lerVariavel(s);
 }
 
 void Semantico::itemInscribe(const Token *token)
@@ -581,6 +626,7 @@ void Semantico::itemInscribe(const Token *token)
     if (t.vetor)
         erro("inscribe não pode escrever o vetor " + entreAspas(t.nome) +
              " inteiro; use um índice", token->getPosition());
+    gerador.escrever();
 }
 
 // ================= controle de fluxo =================

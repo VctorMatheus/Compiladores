@@ -848,3 +848,193 @@ principium
   atomus a;
   a = ~2.5;
 terminus
+
+
+#################################################################
+#              GERAÇÃO DE CÓDIGO PARA O BIP (T4)                 #
+#   ENTRADA: valores lidos pelo legere ($in_port)                #
+#   SAIDA:   o que o assembly gerado escreve em $out_port        #
+#            (executado no simulador testes/simulador_bip.h)     #
+#   GERACAO: NAO (linha N) = compila, mas o assembly não é       #
+#            gerado por causa do que está na linha N             #
+#   Para ver o assembly: build/rodar_casos -p programa.txt "5 3"  #
+#################################################################
+
+=== G01 - Declarações (.data) e saída de inteiros, variáveis e vetores
+ESPERADO: SUCESSO
+SAIDA: 55 0 0 31 5 90 1 0
+---
+principium
+  atomus a, v[4];
+  caracter c;
+  logicum l;
+  inscribe(55, a, v[3], 0x1F, 0b101, 'Z', verum, falsus);
+terminus
+
+=== G02 - Entrada em variáveis e em vetores (índice variável e expressão)
+ESPERADO: SUCESSO
+ENTRADA: 2 10 20 30
+SAIDA: 2 10 30 20
+---
+principium
+  atomus n, v[3];
+  legere(n, v[0], v[n]);
+  legere(v[n - 1]);
+  inscribe(n, v[0], v[1], v[2]);
+terminus
+
+=== G03 - Atribuições a variáveis e a vetores
+ESPERADO: SUCESSO
+SAIDA: 7 7 7 300 307 -5
+---
+principium
+  atomus a, b, v[4];
+  a = 7;
+  b = a;
+  v[0] = b;
+  v[a - 6] = 300;
+  v[v[1] - 298] = v[0] + v[1];
+  v[3] = -5;
+  inscribe(a, b, v[0], v[1], v[2], v[3]);
+terminus
+
+=== G04 - Soma e subtração com parênteses (usa temporários)
+ESPERADO: SUCESSO
+ENTRADA: 10 3 4
+SAIDA: 9 11 13 9 -9
+---
+principium
+  atomus a, b, c, v[3];
+  legere(a, b, c);
+  v[0] = a;
+  v[1] = b;
+  v[2] = c;
+  inscribe(a + b - c, a - (b - c), (a - b) - (c - a), v[0] - (v[1] + v[2]) - (v[2] - v[0]), 1 - a);
+terminus
+
+=== G05 - Operações bit a bit com variáveis e vetores
+ESPERADO: SUCESSO
+ENTRADA: 12 10
+SAIDA: 8 14 6 -13 92 6 -12
+---
+principium
+  atomus a, b, v[2];
+  legere(a, b);
+  v[1] = a;
+  inscribe(a & b, a | b, a ^ b, ~a, v[1] & 0x0F | b << 3, a >> 1, -v[1]);
+terminus
+
+=== G06 - Constantes fora do imediato (-1024..1023) e estouro de 16 bits
+ESPERADO: SUCESSO
+SAIDA: 1502 -1498 -32768
+---
+principium
+  atomus a;
+  a = 1500 + 2;
+  inscribe(a, a - 3000, 32767 + 1);
+terminus
+
+=== G07 - Literal que não cabe em 16 bits gera aviso
+ESPERADO: AVISO (linha 3)
+SAIDA: -25536
+---
+principium
+  atomus a;
+  a = 40000;
+  inscribe(a);
+terminus
+
+=== G08 - Contas entre constantes são feitas pelo compilador (até * e /)
+ESPERADO: SUCESSO
+SAIDA: 12 3 3 1 10
+---
+principium
+  atomus a, v[2 * 5];
+  a = 3 * 4;
+  v[9] = 10;
+  inscribe(a, 10 / 3, 7 % 4, 2 < 3, v[9]);
+terminus
+
+=== GN01 - Multiplicação entre variáveis: o BIP não tem
+ESPERADO: SUCESSO
+GERACAO: NAO (linha 4)
+---
+principium
+  atomus a;
+  a = 2;
+  a = a * 3;
+  inscribe(a);
+terminus
+
+=== GN02 - Deslocamento por variável: SLL/SRL só aceitam constante
+ESPERADO: SUCESSO
+GERACAO: NAO (linha 4)
+---
+principium
+  atomus a, n;
+  legere(a, n);
+  inscribe(a << n);
+terminus
+
+=== GN03 - fractio: o BIP só trabalha com inteiros
+ESPERADO: SUCESSO
+GERACAO: NAO (linha 2)
+---
+principium
+  fractio f;
+  f = 1.5;
+  inscribe(f);
+terminus
+
+=== GN04 - Texto no inscribe: o BIP só escreve números
+ESPERADO: SUCESSO
+GERACAO: NAO (linha 2)
+---
+principium
+  inscribe("Ave");
+terminus
+
+=== GN05 - Desvio condicional ainda não gera código (T5)
+ESPERADO: SUCESSO
+GERACAO: NAO (linha 4)
+---
+principium
+  atomus a;
+  legere(a);
+  si (a) fac {
+    inscribe(a);
+  }
+terminus
+
+=== GN06 - Laço ainda não gera código (T5)
+ESPERADO: SUCESSO
+GERACAO: NAO (linha 4)
+---
+principium
+  atomus a;
+  legere(a);
+  dum (a) fac {
+    a = a - 1;
+  }
+terminus
+
+=== GN07 - Relacional em expressão ainda não gera código (T5)
+ESPERADO: SUCESSO
+GERACAO: NAO (linha 4)
+---
+principium
+  atomus a;
+  legere(a);
+  inscribe(a > 3);
+terminus
+
+=== GN08 - Funções ainda não geram código (T6)
+ESPERADO: SUCESSO
+GERACAO: NAO (linha 2)
+---
+principium
+  opus atomus dobro(atomus n) sic
+    reditus n + n;
+  cis
+  inscribe(dobro(2));
+terminus

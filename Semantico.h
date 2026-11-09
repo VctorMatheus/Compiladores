@@ -3,6 +3,7 @@
 
 #include "Token.h"
 #include "SemanticError.h"
+#include "GeradorBIP.h"
 #include "TabelaSimbolos.h"
 #include "Tipos.h"
 
@@ -30,6 +31,9 @@ public:
     // Tabela de símbolos completa (inclusive escopos já fechados), para a IDE
     std::vector<Simbolo> getSimbolos() const { return tabela.todos(); }
 
+    // Assembly do BIP gerado junto com a análise (ou o motivo de não ter sido gerado)
+    const GeradorBIP &getGerador() const { return gerador; }
+
 private:
     struct Identificador { Simbolo *simbolo; int posicao; };
     struct Operador { std::string lexema; int posicao; };
@@ -38,6 +42,7 @@ private:
 
     TabelaSimbolos tabela;
     std::vector<Aviso> avisos;
+    GeradorBIP gerador;
 
     // Declaração em andamento (#1 a #4)
     Tipo tipoAtual = Tipo::Atomus;

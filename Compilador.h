@@ -19,6 +19,10 @@ struct ResultadoCompilacao
     int avisos = 0;  // avisos do semântico (listados na mensagem)
     // Tabela de símbolos montada pelo semântico (parcial se houve erro)
     std::vector<Simbolo> simbolos;
+    // Assembly do BIP (vazio se houve erro ou se o programa usa algo que ainda não gera código;
+    // nesse caso semAssembly explica o motivo, com linha e coluna)
+    QString assembly;
+    QString semAssembly;
 };
 
 class Compilador

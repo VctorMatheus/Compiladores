@@ -92,6 +92,21 @@ ResultadoCompilacao Compilador::compilar(const QString &codigoFonte)
                                   .arg(linha).arg(coluna).arg(QString::fromStdString(a.mensagem));
             }
         }
+
+        // Geração de código para o BIP (feita junto com a análise semântica)
+        const GeradorBIP &gerador = semantico.getGerador();
+        if (gerador.ativo()) {
+            r.assembly = QString::fromStdString(gerador.assembly());
+            r.mensagem += QStringLiteral("\n\nCódigo assembly gerado (aba Assembly).");
+        } else {
+            int linha, coluna;
+            calcularLinhaColuna(fonte, gerador.getPosicaoMotivo(), linha, coluna);
+            const QString motivo = QString::fromStdString(gerador.getMotivo());
+            r.semAssembly = linha > 0
+                ? QStringLiteral("Linha %1, coluna %2: %3").arg(linha).arg(coluna).arg(motivo)
+                : motivo;
+            r.mensagem += QStringLiteral("\n\nCódigo assembly não gerado. ") + r.semAssembly;
+        }
     } catch (const LexicalError &e) {
         calcularLinhaColuna(fonte, e.getPosition(), r.linha, r.coluna);
         QString msg = QString::fromUtf8(e.getMessage());

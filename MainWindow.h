@@ -20,15 +20,18 @@ public:
 
 private slots:
     void compilar();
+    void salvarAssembly();
 
 private:
     void preencherTabela(const std::vector<Simbolo> &simbolos);
 
     QPlainTextEdit *editor;     // Campo de texto
     QPushButton *botaoCompilar; // Botão Compilar
-    QTabWidget *abas;           // Abas "Saída" e "Tabela de Símbolos"
+    QPushButton *botaoSalvar;   // Salva o assembly gerado (.asm) para abrir no Bipide
+    QTabWidget *abas;           // Abas "Saída", "Tabela de Símbolos" e "Assembly"
     QPlainTextEdit *saida;      // Campo de resposta
     QTableWidget *tabela;       // Tabela de símbolos da última compilação
+    QPlainTextEdit *assembly;   // Código gerado para o BIP na última compilação
 };
 
 #endif
