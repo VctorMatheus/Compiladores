@@ -27,6 +27,9 @@ set(SEMANTICO_SOURCES
     GeradorBIP.cpp GeradorBIP.h
 )
 
+# Catálogo de todos os tokens da linguagem (aba Tokens; conferido pelo rodar_casos)
+set(TOKENS_SOURCES CatalogoTokens.cpp CatalogoTokens.h)
+
 # Arquivos da IDE
 set(IDE_SOURCES
     main.cpp
@@ -35,7 +38,7 @@ set(IDE_SOURCES
     Estandarte.cpp Estandarte.h
 )
 
-add_executable(CompiladorIDE ${IDE_SOURCES} ${GALS_SOURCES} ${SEMANTICO_SOURCES})
+add_executable(CompiladorIDE ${IDE_SOURCES} ${GALS_SOURCES} ${SEMANTICO_SOURCES} ${TOKENS_SOURCES})
 
 target_link_libraries(CompiladorIDE PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 
@@ -81,7 +84,7 @@ endif()
 
 # Testes automáticos, sem Qt: roda todos os casos de casos_de_teste.txt
 #   cmake --build build --target testar
-add_executable(rodar_casos EXCLUDE_FROM_ALL testes/rodar_casos.cpp ${GALS_SOURCES} ${SEMANTICO_SOURCES})
+add_executable(rodar_casos EXCLUDE_FROM_ALL testes/rodar_casos.cpp ${GALS_SOURCES} ${SEMANTICO_SOURCES} ${TOKENS_SOURCES})
 target_include_directories(rodar_casos PRIVATE ${CMAKE_SOURCE_DIR})
 add_custom_target(testar
     COMMAND rodar_casos "${CMAKE_SOURCE_DIR}/casos_de_teste.txt"

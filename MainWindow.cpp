@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "CatalogoTokens.h"
 #include "Compilador.h"
 #include "Estandarte.h"
 #include "TabelaSimbolos.h"
@@ -205,11 +206,31 @@ MainWindow::MainWindow(QWidget *parent)
     tabela->setSelectionBehavior(QAbstractItemView::SelectRows);
     tabela->setAlternatingRowColors(true);
 
+    // Tokens da linguagem: referência fixa, preenchida uma vez a partir do CatalogoTokens
+    tabelaTokens = new QTableWidget(0, 5);
+    tabelaTokens->setFont(fonteTabela);
+    tabelaTokens->setHorizontalHeaderLabels({
+        QStringLiteral("Código"), QStringLiteral("Token"), QStringLiteral("Lexema / Padrão"),
+        QStringLiteral("Categoria"), QStringLiteral("Significado") });
+    tabelaTokens->horizontalHeaderItem(0)->setToolTip(QStringLiteral("Número do token gerado pelo GALS"));
+    tabelaTokens->horizontalHeaderItem(1)->setToolTip(QStringLiteral("Nome do token no Roman++.vgls"));
+    tabelaTokens->horizontalHeader()->setFont(fonteRotulo);
+    tabelaTokens->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    tabelaTokens->horizontalHeader()->setStretchLastSection(true);
+    tabelaTokens->verticalHeader()->setVisible(false);
+    // Com a janela estreita, o significado quebra em mais linhas em vez de ser cortado
+    tabelaTokens->verticalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    tabelaTokens->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    tabelaTokens->setSelectionBehavior(QAbstractItemView::SelectRows);
+    tabelaTokens->setAlternatingRowColors(true);
+    preencherTokens();
+
     abas = new QTabWidget;
     abas->tabBar()->setFont(fonteRotulo);
     abas->tabBar()->setCursor(Qt::PointingHandCursor);
     abas->addTab(saida, QStringLiteral("Saída"));
     abas->addTab(tabela, QStringLiteral("Tabela de Símbolos"));
+    abas->addTab(tabelaTokens, QStringLiteral("Tokens"));
 
     // Assembly do BIP (requisito do T4): fonte de largura fixa para alinhar as instruções
     assembly = new QPlainTextEdit;
@@ -318,5 +339,45 @@ void MainWindow::preencherTabela(const std::vector<Simbolo> &simbolos)
         };
         for (int c = 0; c < colunas.size(); ++c)
             tabela->setItem(i, c, new QTableWidgetItem(colunas[c]));
+    }
+}
+
+void MainWindow::preencherTokens()
+{
+    const QString nada = QStringLiteral("-");
+    const std::vector<InfoToken> &tokens = catalogoTokens();
+    QFont fonteItalico = tabelaTokens->font();
+    fonteItalico.setItalic(true);
+
+    tabelaTokens->setRowCount(static_cast<int>(tokens.size()));
+    for (int i = 0; i < static_cast<int>(tokens.size()); ++i) {
+        const InfoToken &t = tokens[i];
+        const bool descartado = t.id == EPSILON;
+
+        QString significado = QString::fromUtf8(t.significado);
+        if (t.exemplo && !descartado)
+            significado += QStringLiteral("; ex.: %1").arg(QString::fromUtf8(t.exemplo));
+        if (t.semUso)
+            significado += QStringLiteral(" (reservado, ainda sem uso na gramática)");
+
+        const QStringList colunas = {
+            descartado ? nada : QString::number(t.id),
+            descartado ? nada : QString::fromUtf8(t.nome),
+            QString::fromUtf8(t.lexema),
+            QString::fromUtf8(t.categoria),
+            significado,
+        };
+        for (int c = 0; c < colunas.size(); ++c) {
+            auto *item = new QTableWidgetItem(colunas[c]);
+            if (c == 0)
+                item->setTextAlignment(Qt::AlignCenter);
+            if (t.semUso || descartado) {
+                item->setFont(fonteItalico);
+                item->setToolTip(descartado
+                    ? QStringLiteral("Descartado pelo léxico: não chega ao sintático")
+                    : QStringLiteral("O léxico reconhece, mas nenhuma regra da gramática aceita (erro sintático)"));
+            }
+            tabelaTokens->setItem(i, c, item);
+        }
     }
 }

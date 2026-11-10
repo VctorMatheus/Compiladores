@@ -32,7 +32,8 @@ terminus
 | `SemanticTable.h` | Tabela de compatibilidade de tipos (modelo do professor, preenchido para a Roman++) |
 | `GeradorBIP.*` | Geração de código assembly para o processador BIP (Bipide 3.0) |
 | `Compilador.*` | Ponte entre a IDE e os analisadores (erros → linha/coluna) |
-| `MainWindow.*`, `main.cpp` | Interface: editor, botões Compilar e Salvar .asm, abas Saída / Tabela de Símbolos / Assembly |
+| `MainWindow.*`, `main.cpp` | Interface: editor, botões Compilar e Salvar .asm, abas Saída / Tabela de Símbolos / Tokens / Assembly |
+| `CatalogoTokens.*` | Lista de todos os tokens da linguagem (código, lexema, categoria e significado) mostrada na aba Tokens |
 | `fontes/` | Fontes embutidas (Cinzel, Marcellus SC, Almendra, Alegreya — licença SIL OFL) |
 | `imagens/` | Fundo de papiro e o script Python que o gera |
 | `casos_de_teste.txt` | Cenários de sucesso, de erro léxico/sintático/semântico e de avisos |
@@ -52,7 +53,7 @@ cmake --build build
 
 O build roda o `windeployqt` automaticamente, então `build/CompiladorIDE.exe` abre direto pelo Explorer.
 
-**Testes** (todos os casos de `casos_de_teste.txt`, sem abrir a IDE):
+**Testes** (todos os casos de `casos_de_teste.txt` e a conferência do catálogo da aba Tokens, sem abrir a IDE):
 
 ```bash
 cmake --build build --target testar
@@ -74,6 +75,9 @@ O `.vgls` é o formato de projeto do Web-GALS (o `.gals` é o do GALS 2003) e se
 linguagem-alvo; a linha `Language` só guarda a escolhida. Do zip gerado, copie para a raiz **só o
 `Constants.cpp` e o `Constants.h`** (os demais arquivos não mudam). **Nunca copie o `Semantico.*`**: o do
 GALS é vazio e apagaria o analisador semântico.
+
+Se os tokens mudarem, atualize também o `CatalogoTokens.cpp` (a lista da aba *Tokens*): o `testar` confere o
+catálogo com o léxico e o sintático gerados e aponta o token que faltar, sobrar ou não for reconhecido.
 
 Se o Web-GALS perguntar qual ação executar ("Executar ação semântica N" ou "Empilhar"), a gramática tem
 um conflito: não gere o código, corrija a posição das ações. A causa mais comum é usar o mesmo número de
@@ -97,6 +101,9 @@ ação no fim de produções diferentes; por isso cada nível de precedência da
 - **Tabela de símbolos:** a aba *Tabela de Símbolos* da IDE mostra, a cada compilação, todos os identificadores
   (programa, funções, parâmetros, variáveis e vetores) com tipo, modalidade, escopo (`global`, `principal`,
   nome da função, `principal1`... para blocos), inicialização, uso, posição do parâmetro e tamanho do vetor.
+- **Tokens:** a aba *Tokens* da IDE lista todos os tokens da linguagem (código do GALS, nome, lexema ou padrão,
+  categoria e significado), além do que o léxico descarta (espaços e comentários). Os reservados que a
+  gramática ainda não usa (`ergo`, `opta`, `casus`, `:`) aparecem em itálico.
 
 ## Geração de código para o BIP
 

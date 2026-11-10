@@ -24,13 +24,15 @@ private slots:
 
 private:
     void preencherTabela(const std::vector<Simbolo> &simbolos);
+    void preencherTokens();
 
     QPlainTextEdit *editor;     // Campo de texto
     QPushButton *botaoCompilar; // Botão Compilar
     QPushButton *botaoSalvar;   // Salva o assembly gerado (.asm) para abrir no Bipide
-    QTabWidget *abas;           // Abas "Saída", "Tabela de Símbolos" e "Assembly"
+    QTabWidget *abas;           // Abas "Saída", "Tabela de Símbolos", "Tokens" e "Assembly"
     QPlainTextEdit *saida;      // Campo de resposta
     QTableWidget *tabela;       // Tabela de símbolos da última compilação
+    QTableWidget *tabelaTokens; // Todos os tokens da linguagem (fixa)
     QPlainTextEdit *assembly;   // Código gerado para o BIP na última compilação
 };
 

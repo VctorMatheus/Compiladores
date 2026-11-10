@@ -30,8 +30,11 @@ colegas se fazem por software). Material do BIP: slides "Conjunto de Instruçõe
   ação (mesma numeração `#n`). Pilha de operandos paralela à `pilhaTipos` (Imediato / Memória /
   Acumulador): literais e variáveis são "preguiçosos", o ACC só vai para temporário quando preciso.
 - `Compilador.*`: ponte IDE ↔ analisadores (posição → linha/coluna, lista de avisos, assembly).
-- `MainWindow.*`, `Estandarte.*`, `main.cpp`: interface (abas Saída, Tabela de Símbolos, Assembly;
-  botão Salvar .asm).
+- `MainWindow.*`, `Estandarte.*`, `main.cpp`: interface (abas Saída, Tabela de Símbolos, Tokens,
+  Assembly; botão Salvar .asm).
+- `CatalogoTokens.*`: lista **escrita à mão** dos tokens do `.vgls` para a aba Tokens (não usa Qt). O
+  `rodar_casos` a confere com `PRODUCTIONS`/`PARSER_TABLE` e com o `Lexico`: mudou token no `.vgls`,
+  atualize o catálogo (inclusive o `semUso`, que tem de bater com a gramática).
 - `casos_de_teste.txt` + `testes/rodar_casos.cpp`: testes automáticos; `testes/simulador_bip.h`
   executa o asm gerado nos casos com `SAIDA:`.
 
@@ -118,7 +121,8 @@ Se a IDE estiver aberta, o link do `CompiladorIDE.exe` falha com "Permission den
 - Mensagens sintáticas são só "Erro estado N" (a IDE acrescenta o token encontrado); dá para listar os
   tokens esperados a partir da `PARSER_TABLE`.
 - No `.vgls`: o comentário "OBS" antigo e o `#SimulatorText` (sintaxe velha de `opus`) ainda estão lá.
-- Tokens que existem mas nunca são aceitos pela gramática: `opta`, `casus`, `ergo`, `:`.
+- Tokens que existem mas nunca são aceitos pela gramática: `opta`, `casus`, `ergo`, `:` (marcados com
+  `semUso` no `CatalogoTokens.cpp`; se a gramática passar a aceitá-los, o `testar` acusa).
 
 ## Convenções
 

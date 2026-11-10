@@ -17,8 +17,10 @@
 //   ---
 //   <código até o próximo "===" ou "####">
 //
+// Além dos casos, confere o catálogo da aba Tokens (CatalogoTokens.cpp) com o léxico e o sintático.
 // Termina com código 1 se algum caso falhar.
 
+#include "CatalogoTokens.h"
 #include "Lexico.h"
 #include "Sintatico.h"
 #include "Semantico.h"
@@ -31,6 +33,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -184,6 +187,62 @@ bool confere(const std::string &esperado, const Resultado &r)
     return r.fase == fase && (linha.empty() || std::to_string(r.linha) == linha);
 }
 
+// Confere o catálogo de tokens com as tabelas geradas pelo GALS: cada token aparece uma vez, o
+// léxico reconhece o exemplo (ou o lexema fixo) como aquele token, os descartados não viram token
+// e 'semUso' bate com a PARSER_TABLE. Devolve os problemas encontrados (vazio = ok).
+std::vector<std::string> conferirCatalogoTokens()
+{
+    std::vector<std::string> problemas;
+    const std::vector<InfoToken> &catalogo = catalogoTokens();
+
+    // No GALS os não terminais são numerados logo depois do último terminal
+    int ultimoToken = PRODUCTIONS[0][0];
+    for (const auto &producao : PRODUCTIONS)
+        ultimoToken = std::min(ultimoToken, producao[0]);
+    --ultimoToken;
+
+    for (int id = t_ID; id <= ultimoToken; ++id) {
+        const auto vezes = std::count_if(catalogo.begin(), catalogo.end(),
+                                         [&](const InfoToken &t) { return t.id == id; });
+        if (vezes != 1)
+            problemas.push_back("o token " + std::to_string(id) + " aparece " +
+                                std::to_string(vezes) + " vez(es) no catálogo");
+    }
+
+    const int estados = sizeof(PARSER_TABLE) / sizeof(PARSER_TABLE[0]);
+    for (const InfoToken &t : catalogo) {
+        const std::string nome = t.nome ? t.nome : t.significado;
+        const std::string texto = t.exemplo ? t.exemplo : t.lexema;
+        if (t.id != EPSILON && (t.id < t_ID || t.id > ultimoToken)) {
+            problemas.push_back(nome + ": código " + std::to_string(t.id) + " não é de token");
+            continue;
+        }
+
+        try {
+            Lexico lexico(texto.c_str());
+            std::unique_ptr<Token> token(lexico.nextToken());
+            std::unique_ptr<Token> resto(token ? lexico.nextToken() : nullptr);
+            const bool reconhecido = t.id == EPSILON
+                ? !token
+                : token && token->getId() == t.id && token->getLexeme() == texto && !resto;
+            if (!reconhecido)
+                problemas.push_back(nome + ": o léxico não reconhece \"" + texto + "\" como esse token");
+        } catch (const LexicalError &) {
+            problemas.push_back(nome + ": erro léxico em \"" + texto + "\"");
+        }
+
+        if (t.id != EPSILON) {
+            bool aceito = false;
+            for (int estado = 0; estado < estados && !aceito; ++estado)
+                aceito = PARSER_TABLE[estado][t.id - 1][0] != ERROR;
+            if (aceito == t.semUso)
+                problemas.push_back(nome + (t.semUso ? ": marcado como semUso, mas a gramática o aceita"
+                                                     : ": nenhuma regra da gramática o aceita; marque semUso"));
+        }
+    }
+    return problemas;
+}
+
 std::string lerArquivo(const char *caminho)
 {
     std::ifstream f(caminho, std::ios::binary);
@@ -285,6 +344,13 @@ int main(int argc, char **argv)
         }
     }
     concluirCaso();
+
+    const std::vector<std::string> problemas = conferirCatalogoTokens();
+    (problemas.empty() ? ok : falhas)++;
+    if (!problemas.empty() || detalhado)
+        std::cout << (problemas.empty() ? "ok    " : "FALHA ") << "catálogo de tokens (CatalogoTokens.cpp)\n";
+    for (const std::string &p : problemas)
+        std::cout << "      " << p << "\n";
 
     std::cout << ok << " ok, " << falhas << " falhas\n";
     return falhas == 0 ? 0 : 1;
